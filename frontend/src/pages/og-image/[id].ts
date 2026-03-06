@@ -1,12 +1,5 @@
-import { ImageResponse } from "@vercel/og";
 import type { APIRoute } from "astro";
-
-// Buffer доступен глобально в Node.js runtime
-declare const Buffer: {
-  from(data: ArrayBuffer | string, encoding?: string): {
-    toString(encoding: string): string;
-  };
-};
+import sharp from "sharp";
 
 export const GET: APIRoute = async ({ params }) => {
   const { id: rawId } = params;
@@ -71,166 +64,127 @@ export const GET: APIRoute = async ({ params }) => {
     }
   }
 
-  const fullName = `${memorial.last_name} ${memorial.first_name} ${memorial.middle_name ?? ""}`.trim();
+  const lastName = memorial.last_name;
+  const firstName = memorial.first_name;
+  const middleName = memorial.middle_name ?? "";
   const birthDate = formatDate(memorial.birth_date);
   const deathDate = formatDate(memorial.death_date);
   const location = memorial.birth_place || memorial.burial_city || memorial.burial_place || "";
   const photoUrl = resolvePhotoUrl(memorial);
 
-  // Загружаем фото заранее и конвертируем в base64 для @vercel/og
-  let photoBase64 = "";
   try {
+    const width = 1200;
+    const height = 630;
+    const photoSize = 480;
+    
+    console.log('[og-image] Fetching photo from:', photoUrl);
     const photoRes = await fetch(photoUrl);
-    if (photoRes.ok) {
-      const buffer = await photoRes.arrayBuffer();
-      const base64 = Buffer.from(buffer).toString("base64");
-      const contentType = photoRes.headers.get("content-type") || "image/jpeg";
-      photoBase64 = `data:${contentType};base64,${base64}`;
+    if (!photoRes.ok) {
+      throw new Error(`Failed to fetch photo: ${photoRes.status}`);
     }
-  } catch (error) {
-    console.error("[og-image] Error loading photo:", error);
-    // Используем fallback аватар
-    photoBase64 = photoUrl;
-  }
+    const photoBuffer = Buffer.from(await photoRes.arrayBuffer());
+    
+    // Просто ресайзим фото
+    const photo = await sharp(photoBuffer)
+      .resize(photoSize, photoSize, { fit: "cover", position: "center" })
+      .toBuffer();
 
-  try {
-    const html = {
-      type: "div",
-      props: {
-        style: {
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          alignItems: "center",
-          background: "linear-gradient(135deg, #1e293b 0%, #111827 55%, #0b1120 100%)",
-          padding: "60px 80px",
-          fontFamily: "system-ui, sans-serif",
+    // Создаем полное изображение в одном SVG
+    const fullSvg = `
+      <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#475569;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#334155;stop-opacity:1" />
+          </linearGradient>
+        </defs>
+        
+        <!-- Фон карточки -->
+        <rect width="${width}" height="${height}" rx="32" ry="32" fill="url(#grad)"/>
+        
+        <!-- Православный крест -->
+        ${memorial.religion === "orthodox" ? `
+          <g transform="translate(1080, 60) scale(2.5)">
+            <path d="M12 2v20M8 6h8M6 10h12M8 18h8" stroke="white" stroke-width="2" fill="none"/>
+            <path d="M12 2L10 4h4l-2-2zM12 22l-2-2h4l-2 2z" fill="white"/>
+          </g>
+        ` : ''}
+        
+        <!-- Фамилия -->
+        <text x="580" y="140" font-family="system-ui, -apple-system, sans-serif" font-size="64" font-weight="800" fill="white" text-anchor="start">
+          ${lastName.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}
+        </text>
+        <!-- Имя -->
+        <text x="580" y="210" font-family="system-ui, -apple-system, sans-serif" font-size="64" font-weight="800" fill="white" text-anchor="start">
+          ${firstName.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}
+        </text>
+        <!-- Отчество -->
+        ${middleName ? `<text x="580" y="280" font-family="system-ui, -apple-system, sans-serif" font-size="64" font-weight="800" fill="white" text-anchor="start">
+          ${middleName.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}
+        </text>` : ''}
+        
+        <!-- Даты -->
+        <text x="580" y="${middleName ? '350' : '290'}" font-family="system-ui, -apple-system, sans-serif" font-size="32" font-weight="600" fill="#ef4444">
+          ${birthDate} — ${deathDate}
+        </text>
+        
+        <!-- Локация -->
+        ${location ? `
+          <g transform="translate(580, ${middleName ? '385' : '325'}) scale(1.2)">
+            <path
+              d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+              stroke="rgba(241, 245, 249, 1)"
+              stroke-width="2"
+              fill="none"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+              stroke="rgba(241, 245, 249, 1)"
+              stroke-width="2"
+              fill="none"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </g>
+          <text x="610" y="${middleName ? '408' : '348'}" font-family="system-ui, -apple-system, sans-serif" font-size="24" fill="rgba(241, 245, 249, 1)">
+            ${location.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}
+          </text>
+        ` : ''}
+        
+        <!-- Текст -->
+        <text x="580" y="${middleName ? (location ? '470' : '420') : (location ? '410' : '360')}" font-family="system-ui, -apple-system, sans-serif" font-size="26" font-style="italic" fill="rgba(241, 245, 249, 0.9)">
+          Что то написать надо
+        </text>
+      </svg>
+    `;
+
+    // Генерируем фон
+    const background = await sharp(Buffer.from(fullSvg))
+      .png()
+      .toBuffer();
+
+    // Накладываем фото
+    const image = await sharp(background)
+      .composite([
+        {
+          input: photo,
+          top: 75,
+          left: 70,
         },
-        children: [
-          // Фото
-          {
-            type: "div",
-            props: {
-              style: {
-                width: "320px",
-                height: "320px",
-                marginRight: "60px",
-                borderRadius: "16px",
-                overflow: "hidden",
-                border: "1px solid rgba(255, 255, 255, 0.2)",
-                boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.3)",
-                display: "flex",
-              },
-              children: {
-                type: "img",
-                props: {
-                  src: photoBase64,
-                  alt: fullName,
-                  width: "320",
-                  height: "320",
-                  style: {
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                  },
-                },
-              },
-            },
-          },
-          // Текст
-          {
-            type: "div",
-            props: {
-              style: {
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "center",
-                color: "white",
-                flex: 1,
-              },
-              children: [
-                // Имя
-                {
-                  type: "div",
-                  props: {
-                    style: {
-                      fontSize: "56px",
-                      fontWeight: 800,
-                      lineHeight: 1.2,
-                      marginBottom: "24px",
-                      color: "white",
-                    },
-                    children: fullName,
-                  },
-                },
-                // Даты
-                {
-                  type: "div",
-                  props: {
-                    style: {
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      borderRadius: "12px",
-                      border: "1px solid rgba(255, 255, 255, 0.45)",
-                      background: "rgba(15, 23, 42, 0.45)",
-                      padding: "12px 16px",
-                      marginBottom: "20px",
-                      width: "fit-content",
-                    },
-                    children: [
-                      {
-                        type: "span",
-                        props: {
-                          style: { fontSize: "20px", fontWeight: 600, color: "white" },
-                          children: birthDate,
-                        },
-                      },
-                      {
-                        type: "span",
-                        props: {
-                          style: { fontSize: "20px", fontWeight: 600, color: "white" },
-                          children: " — ",
-                        },
-                      },
-                      {
-                        type: "span",
-                        props: {
-                          style: { fontSize: "20px", fontWeight: 600, color: "white" },
-                          children: deathDate,
-                        },
-                      },
-                    ],
-                  },
-                },
-                // Локация
-                location
-                  ? {
-                      type: "div",
-                      props: {
-                        style: {
-                          fontSize: "20px",
-                          color: "rgba(241, 245, 249, 1)",
-                          display: "flex",
-                          alignItems: "center",
-                        },
-                        children: `📍 ${location}`,
-                      },
-                    }
-                  : null,
-              ].filter(Boolean),
-            },
-          },
-        ],
-      },
-    };
+      ])
+      .png()
+      .toBuffer();
 
-    return new ImageResponse(html as any, {
-      width: 1200,
-      height: 630,
+    return new Response(new Uint8Array(image), {
+      headers: {
+        "Content-Type": "image/png",
+        "Cache-Control": "public, max-age=31536000, immutable",
+      },
     });
   } catch (error) {
     console.error("[og-image] Error generating image:", error);
-    return new Response("Error generating image", { status: 500 });
+    return new Response(`Error generating image: ${error}`, { status: 500 });
   }
 };

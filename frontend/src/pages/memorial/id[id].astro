@@ -137,21 +137,15 @@ function resolvePhotoUrl(memorial: MemorialApi): string {
 }
 
 /**
- * Генерирует URL маленького изображения - просто фото человека из мемориала
- * Используется для summary card в Twitter и других соцсетях
- */
-function resolvePhotoUrlSmall(memorial: MemorialApi): string {
-  // Просто возвращаем фото мемориала - это будет маленькое изображение
-  return resolvePhotoUrl(memorial);
-}
-
-/**
  * Генерирует URL изображения для Open Graph
- * Использует endpoint /og-image/[id] который генерирует PNG через @vercel/og
+ * Используем сгенерированное изображение с Sharp
  */
 function resolvePhotoUrlForOG(memorial: MemorialApi): string {
-  const origin = import.meta.env.PUBLIC_APP_URL || "https://pagesofmemory.ru";
-  return `${origin}/og-image/${memorial.id}`;
+  // Используем endpoint для генерации OG изображения
+  const baseUrl = import.meta.env.DEV 
+    ? "http://localhost:4321" 
+    : (import.meta.env.PUBLIC_APP_URL || "https://pagesofmemory.ru");
+  return `${baseUrl}/og-image/${memorial.id}`;
 }
 
 function resolveS3Path(path: string): string {
@@ -211,7 +205,6 @@ const hasMediaData = memorialPhotos.length > 0 || memorialVideos.length > 0 || b
       : "Цифровая страница памяти о близком человеке"
   }
   metaImage={memorial ? resolvePhotoUrlForOG(memorial) : undefined}
-  metaImageSmall={memorial ? resolvePhotoUrlSmall(memorial) : undefined}
   metaImageWidth={1200}
   metaImageHeight={630}
   metaType="article"
