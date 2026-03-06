@@ -46,14 +46,11 @@ type UserProfileDto = {
   memories: UserMemorySummary[];
 };
 
+import { getApiBaseUrl } from "../../lib/api-url";
+
 const { id } = Astro.params;
 
-// Для SSR используем полный URL к backend, для клиента - относительный через nginx
-const isServer = typeof window === 'undefined';
-const API_BASE_URL = isServer 
-  ? 'http://127.0.0.1:4000/api' 
-  : (import.meta.env.PUBLIC_API_BASE_URL ?? '/api');
-
+const API_BASE_URL = getApiBaseUrl();
 const res = await fetch(`${API_BASE_URL}/users/${id}`);
 if (!res.ok) {
   throw new Error(`Failed to load user profile (${res.status})`);
