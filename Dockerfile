@@ -25,6 +25,9 @@ RUN cd frontend && npm run build
 # Production образ
 FROM node:20-alpine
 
+# Устанавливаем nginx
+RUN apk add --no-cache nginx
+
 WORKDIR /app
 
 # Копируем собранные файлы и node_modules из builder
@@ -36,12 +39,15 @@ COPY --from=builder /app/frontend/dist ./frontend/dist
 COPY --from=builder /app/frontend/node_modules ./frontend/node_modules
 COPY --from=builder /app/frontend/package.json ./frontend/
 
+# Копируем nginx конфиг
+COPY nginx.conf /etc/nginx/nginx.conf
+
 # Копируем startup скрипт
 COPY start.sh /app/start.sh
 RUN chmod +x /app/start.sh
 
-# Открываем порты
-EXPOSE 4000 4321
+# Открываем только порт 80 для nginx
+EXPOSE 80
 
-# Запускаем оба приложения
+# Запускаем все сервисы
 CMD ["/app/start.sh"]
