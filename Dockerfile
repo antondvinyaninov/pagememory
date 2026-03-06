@@ -19,24 +19,14 @@ COPY frontend ./frontend
 # Собираем backend
 RUN cd backend && npm run build
 
-# Собираем frontend с переменными окружения
-# PUBLIC_API_BASE_URL должен быть полным URL для SSR запросов
-ARG PUBLIC_API_BASE_URL=http://127.0.0.1:4000/api
-ARG PUBLIC_APP_URL=https://pagesofmemory.ru
-ARG PUBLIC_S3_BASE_URL=https://s3.firstvds.ru/memory
-ARG PUBLIC_SITE_NAME="Страницы памяти"
-ARG PUBLIC_PROJECT_ICON_URL=/brand/memory-icon.png
-ARG PUBLIC_YANDEX_MAPS_API_KEY=6645de69-1da7-468b-86da-59ced1a03485
-
-ENV PUBLIC_API_BASE_URL=$PUBLIC_API_BASE_URL
-ENV PUBLIC_APP_URL=$PUBLIC_APP_URL
-ENV PUBLIC_S3_BASE_URL=$PUBLIC_S3_BASE_URL
-ENV PUBLIC_SITE_NAME=$PUBLIC_SITE_NAME
-ENV PUBLIC_PROJECT_ICON_URL=$PUBLIC_PROJECT_ICON_URL
-ENV PUBLIC_YANDEX_MAPS_API_KEY=$PUBLIC_YANDEX_MAPS_API_KEY
-
-# Для SSR запросов нужен полный URL к backend
-ENV API_BASE_URL=http://127.0.0.1:4000/api
+# Собираем frontend с переменными окружения для production
+# ВАЖНО: PUBLIC_API_BASE_URL должен быть полным URL для SSR
+ENV PUBLIC_API_BASE_URL=http://127.0.0.1:4000/api
+ENV PUBLIC_APP_URL=https://pagesofmemory.ru
+ENV PUBLIC_S3_BASE_URL=https://s3.firstvds.ru/memory
+ENV PUBLIC_SITE_NAME="Страницы памяти"
+ENV PUBLIC_PROJECT_ICON_URL=/brand/memory-icon.png
+ENV PUBLIC_YANDEX_MAPS_API_KEY=6645de69-1da7-468b-86da-59ced1a03485
 
 RUN cd frontend && npm run build
 
