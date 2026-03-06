@@ -18,6 +18,7 @@ import {
   UploadedFiles,
   UseInterceptors,
 } from "@nestjs/common";
+import { IsOptional, IsString } from "class-validator";
 import { MemorialsService, type UpsertMemorialInput } from "./memorials.service";
 import { AuthService } from "../auth/auth.service";
 import { getAuthToken } from "../../common/auth-cookie";
@@ -40,12 +41,22 @@ type UploadedMemoryFiles = {
 };
 
 class CreateMemoryDto {
+  @IsOptional()
+  @IsString()
   content?: string;
+
+  @IsOptional()
+  @IsString()
   relationship_type?: string;
+
+  @IsOptional()
+  @IsString()
   relationship_custom?: string;
 }
 
 class CreateCommentDto {
+  @IsOptional()
+  @IsString()
   content?: string;
 }
 
