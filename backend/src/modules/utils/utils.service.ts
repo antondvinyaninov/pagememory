@@ -45,14 +45,14 @@ export class UtilsService {
   async getPublicSettings(): Promise<{ gtm_id: string }> {
     try {
       const res = await this.db.client.query(
-        `SELECT settings FROM app_settings WHERE id = 1`
+        `SELECT data FROM app_settings WHERE id = 1`
       );
       
       if (res.rows.length === 0) {
         return { gtm_id: "" };
       }
 
-      const settings = res.rows[0].settings || {};
+      const settings = res.rows[0].data || {};
       const analytics = settings.analytics || {};
       const gtmId = typeof analytics.gtm_id === "string" ? analytics.gtm_id : "";
       
