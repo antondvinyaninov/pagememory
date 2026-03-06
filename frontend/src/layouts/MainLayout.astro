@@ -45,10 +45,10 @@ const PROJECT_ICON_URL =
     ? bundledProjectIconUrl
     : PROJECT_ICON_URL_ENV;
 
-// Загружаем GTM ID из базы данных
+// Загружаем GTM ID из базы данных через публичный API
 let GTM_ID = import.meta.env.PUBLIC_GTM_ID ?? "";
 try {
-  const settingsRes = await fetch(`${API_BASE_URL}/admin/settings`);
+  const settingsRes = await fetch(`${API_BASE_URL}/utils/public-settings`);
   if (settingsRes.ok) {
     const settings = await settingsRes.json();
     GTM_ID = String(settings?.gtm_id ?? GTM_ID);

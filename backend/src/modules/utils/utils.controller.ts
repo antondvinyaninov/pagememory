@@ -12,4 +12,9 @@ export class UtilsController {
     }
     return await this.utilsService.getCitySuggestions(query);
   }
+
+  @Get("public-settings")
+  async getPublicSettings() {
+    return await this.utilsService.getPublicSettings();
+  }
 }
