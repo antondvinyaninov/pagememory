@@ -1,0 +1,498 @@
+---
+import MemorialEditorIsland from "./islands/MemorialEditorIsland";
+import { declineToGenitive } from "../lib/decline-name";
+
+interface MemorialData {
+  id?: number;
+  first_name?: string | null;
+  last_name?: string | null;
+  middle_name?: string | null;
+  birth_date?: string | null;
+  death_date?: string | null;
+  birth_place?: string | null;
+  biography?: string | null;
+  photo?: string | null;
+  religion?: string | null;
+  full_biography?: string | null;
+  education_details?: string | null;
+  career_details?: string | null;
+  achievements?: string | null;
+  military_service?: string | null;
+  military_rank?: string | null;
+  military_years?: string | null;
+  military_details?: string | null;
+  burial_city?: string | null;
+  burial_place?: string | null;
+  burial_address?: string | null;
+  burial_location?: string | null;
+  burial_latitude?: number | null;
+  burial_longitude?: number | null;
+  privacy?: string | null;
+  moderate_memories?: boolean | null;
+  allow_comments?: boolean | null;
+}
+
+interface Props {
+  mode: "create" | "edit";
+  memorial?: MemorialData | null;
+}
+
+const { mode, memorial } = Astro.props as Props;
+const current = memorial ?? {};
+const title = mode === "edit" ? "Редактировать мемориал" : "Создать мемориал";
+const submitLabel = mode === "edit" ? "Сохранить изменения" : "Сохранить как черновик";
+const publishLabel = mode === "edit" ? "Сохранить и опубликовать" : "Опубликовать";
+const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
+const S3_BASE_URL = import.meta.env.PUBLIC_S3_BASE_URL ?? "https://s3.firstvds.ru/memory";
+const YANDEX_MAPS_API_KEY = import.meta.env.PUBLIC_YANDEX_MAPS_API_KEY ?? "";
+const APP_BASE_URL = import.meta.env.PUBLIC_APP_URL ?? "";
+
+const today = new Date().toISOString().slice(0, 10);
+const birthDate = current.birth_date ? String(current.birth_date).slice(0, 10) : "";
+const deathDate = current.death_date ? String(current.death_date).slice(0, 10) : "";
+---
+
+<div
+  class="bg-gray-50 min-h-screen py-6"
+  data-memorial-editor
+  data-mode={mode}
+  data-memorial-id={current.id ? String(current.id) : ""}
+  data-api-base-url={API_BASE_URL}
+  data-s3-base-url={S3_BASE_URL}
+  data-yandex-maps-api-key={YANDEX_MAPS_API_KEY}
+  data-app-base-url={APP_BASE_URL}
+  data-current-photo={current.photo ?? ""}
+>
+  <div class="lg:hidden bg-white shadow-md mb-4">
+    <div class="flex overflow-x-auto gap-2 px-4 py-4">
+      <button type="button" data-tab-btn="basic" class="px-4 py-2 rounded-lg text-sm bg-red-50 text-red-600 whitespace-nowrap">Основное</button>
+      <button type="button" data-tab-btn="biography" class="px-4 py-2 rounded-lg text-sm text-slate-700 hover:bg-gray-50 whitespace-nowrap">Биография</button>
+      <button type="button" data-tab-btn="burial" class="px-4 py-2 rounded-lg text-sm text-slate-700 hover:bg-gray-50 whitespace-nowrap">Захоронение</button>
+      <button type="button" data-tab-btn="media" class="px-4 py-2 rounded-lg text-sm text-slate-700 hover:bg-gray-50 whitespace-nowrap">Медиа</button>
+      <button type="button" data-tab-btn="people" class="px-4 py-2 rounded-lg text-sm text-slate-700 hover:bg-gray-50 whitespace-nowrap">Люди</button>
+      <button type="button" data-tab-btn="settings" class="px-4 py-2 rounded-lg text-sm text-slate-700 hover:bg-gray-50 whitespace-nowrap">Настройки</button>
+      <button type="button" data-tab-btn="qrcode" class="px-4 py-2 rounded-lg text-sm text-slate-700 hover:bg-gray-50 whitespace-nowrap">QR-код</button>
+    </div>
+  </div>
+
+  <div class="container mx-auto px-4">
+    <div class="flex flex-col lg:flex-row gap-6">
+      <main class="flex-1">
+        <div class="bg-white rounded-xl shadow-md p-8">
+          <h1 class="text-2xl font-bold text-slate-700 mb-6">{title}</h1>
+
+          <form id="memorial-form" class="space-y-6">
+            <input type="hidden" name="action" id="memorial-action" value="draft" />
+            <section data-tab-panel="basic" class="space-y-6">
+              <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-4 sm:p-6 border border-blue-100">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Фото и ФИО</h3>
+                <div class="flex flex-col sm:flex-row gap-4 sm:gap-6">
+                  <div class="flex-shrink-0 mx-auto sm:mx-0">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Фото</label>
+                    <label for="photo" class="w-40 h-40 sm:w-56 sm:h-56 bg-white rounded-2xl flex items-center justify-center overflow-hidden border-2 border-dashed border-blue-200 hover:border-blue-300 transition-colors cursor-pointer">
+                      <img id="photo-preview" class="hidden w-full h-full object-cover" alt="Фото" />
+                      <span id="photo-placeholder" class="text-blue-300 text-sm">Загрузить фото</span>
+                    </label>
+                    <input type="file" name="photo" id="photo" accept="image/*,.heic,.heif" class="hidden" />
+                    <p class="mt-2 text-xs text-gray-500 text-center">JPG, PNG, WEBP, HEIC</p>
+                  </div>
+
+                  <div class="flex-1 space-y-4">
+                    <div>
+                      <label for="last_name" class="block text-sm font-medium text-gray-700 mb-1.5">Фамилия *</label>
+                      <input type="text" name="last_name" id="last_name" required value={current.last_name ?? ""} class="w-full px-4 py-2.5 bg-white border border-blue-200 rounded-lg" />
+                    </div>
+                    <div>
+                      <label for="first_name" class="block text-sm font-medium text-gray-700 mb-1.5">Имя *</label>
+                      <input type="text" name="first_name" id="first_name" required value={current.first_name ?? ""} class="w-full px-4 py-2.5 bg-white border border-blue-200 rounded-lg" />
+                    </div>
+                    <div>
+                      <label for="middle_name" class="block text-sm font-medium text-gray-700 mb-1.5">Отчество</label>
+                      <input type="text" name="middle_name" id="middle_name" value={current.middle_name ?? ""} class="w-full px-4 py-2.5 bg-white border border-blue-200 rounded-lg" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-4 sm:p-6 border border-blue-100">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4 sm:mb-6">Даты жизни</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4 sm:gap-5">
+                  <div class="sm:col-span-1 lg:col-span-3">
+                    <label for="birth_date" class="block text-sm font-medium text-gray-700 mb-2">Дата рождения *</label>
+                    <input type="date" name="birth_date" id="birth_date" required value={birthDate} max={today} class="w-full px-4 py-3 bg-white border border-blue-200 rounded-lg" />
+                  </div>
+                  <div class="sm:col-span-1 lg:col-span-3">
+                    <label for="death_date" class="block text-sm font-medium text-gray-700 mb-2">Дата смерти *</label>
+                    <input type="date" name="death_date" id="death_date" required value={deathDate} max={today} class="w-full px-4 py-3 bg-white border border-blue-200 rounded-lg" />
+                  </div>
+                  <div class="sm:col-span-2 lg:col-span-6">
+                    <label for="birth_place" class="block text-sm font-medium text-gray-700 mb-2">Место рождения</label>
+                    <input type="text" name="birth_place" id="birth_place" value={current.birth_place ?? ""} placeholder="Город, регион" class="w-full px-4 py-3 bg-white border border-blue-200 rounded-lg" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-4 sm:p-6 border border-blue-100 space-y-4">
+                <div>
+                  <label for="biography" class="block text-sm font-medium text-gray-700 mb-2">Краткая надпись</label>
+                  <input type="text" name="biography" id="biography" maxlength="80" value={current.biography ?? ""} placeholder="Любящий муж, отец и дедушка..." class="w-full px-4 py-3 bg-white border border-blue-200 rounded-lg" />
+                </div>
+                <div>
+                  <label for="religion" class="block text-sm font-medium text-gray-700 mb-2">Вероисповедание</label>
+                  <select name="religion" id="religion" class="w-full px-4 py-3 bg-white border border-blue-200 rounded-lg">
+                    <option value="none" selected={current.religion === "none"}>Не указано</option>
+                    <option value="orthodox" selected={current.religion === "orthodox"}>Православие</option>
+                    <option value="catholic" selected={current.religion === "catholic"}>Католицизм</option>
+                    <option value="islam" selected={current.religion === "islam"}>Ислам</option>
+                    <option value="judaism" selected={current.religion === "judaism"}>Иудаизм</option>
+                    <option value="buddhism" selected={current.religion === "buddhism"}>Буддизм</option>
+                    <option value="hinduism" selected={current.religion === "hinduism"}>Индуизм</option>
+                    <option value="other" selected={current.religion === "other"}>Другое</option>
+                  </select>
+                </div>
+              </div>
+            </section>
+
+            <section data-tab-panel="biography" class="space-y-6 hidden">
+              <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-100">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">О человеке</h3>
+                <textarea name="full_biography" rows="12" class="w-full px-4 py-3 bg-white border border-blue-200 rounded-lg" placeholder="Подробная биография, важные события, достижения...">{current.full_biography ?? ""}</textarea>
+              </div>
+
+              <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-100 space-y-4">
+                <h3 class="text-lg font-semibold text-gray-900">Образование и карьера</h3>
+                <input type="text" name="education_details" value={current.education_details ?? ""} placeholder="Образование" class="w-full px-4 py-3 bg-white border border-blue-200 rounded-lg" />
+                <input type="text" name="career_details" value={current.career_details ?? ""} placeholder="Карьера" class="w-full px-4 py-3 bg-white border border-blue-200 rounded-lg" />
+                <textarea name="achievements" rows="4" placeholder="Достижения" class="w-full px-4 py-3 bg-white border border-blue-200 rounded-lg">{current.achievements ?? ""}</textarea>
+              </div>
+
+              <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-100 space-y-4">
+                <h3 class="text-lg font-semibold text-gray-900">Военная служба</h3>
+                <input type="text" name="military_service" value={current.military_service ?? ""} placeholder="Место службы" class="w-full px-4 py-3 bg-white border border-blue-200 rounded-lg" />
+                <input type="text" name="military_rank" value={current.military_rank ?? ""} placeholder="Звание" class="w-full px-4 py-3 bg-white border border-blue-200 rounded-lg" />
+                <input type="text" name="military_years" value={current.military_years ?? ""} placeholder="Годы службы" class="w-full px-4 py-3 bg-white border border-blue-200 rounded-lg" />
+                <textarea name="military_details" rows="3" placeholder="Дополнительная информация" class="w-full px-4 py-3 bg-white border border-blue-200 rounded-lg">{current.military_details ?? ""}</textarea>
+              </div>
+            </section>
+
+            <section data-tab-panel="burial" class="space-y-6 hidden">
+              <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-100 space-y-4">
+                <h3 class="text-lg font-semibold text-gray-900">Местоположение</h3>
+                <input
+                  type="text"
+                  name="burial_city"
+                  id="burial_city_input"
+                  placeholder="Город захоронения"
+                  value={current.burial_city ?? ""}
+                  class="w-full px-4 py-3 bg-white border border-blue-200 rounded-lg"
+                />
+                <input
+                  type="text"
+                  name="burial_place"
+                  id="burial_place"
+                  placeholder="Место захоронения"
+                  value={current.burial_place ?? ""}
+                  class="w-full px-4 py-3 bg-white border border-blue-200 rounded-lg"
+                />
+                <input
+                  type="text"
+                  name="burial_address"
+                  id="burial_address"
+                  placeholder="Адрес"
+                  value={current.burial_address ?? ""}
+                  class="w-full px-4 py-3 bg-white border border-blue-200 rounded-lg"
+                />
+                <input
+                  type="text"
+                  name="burial_location"
+                  id="burial_location"
+                  placeholder="Участок, ряд, место"
+                  value={current.burial_location ?? ""}
+                  class="w-full px-4 py-3 bg-white border border-blue-200 rounded-lg"
+                />
+              </div>
+
+              <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-100">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Точное местоположение на карте</h3>
+                <p class="text-sm text-gray-600 mb-4">Кликните по карте, чтобы поставить метку захоронения</p>
+
+                <div id="burial-map-toggle">
+                  <button
+                    type="button"
+                    id="burial-map-show"
+                    class="px-6 py-3 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Показать карту
+                  </button>
+                  <p class="text-xs text-gray-500 mt-2">Сначала укажите город захоронения выше</p>
+                </div>
+
+                <div id="burial-map-block" class="hidden">
+                  <div id="burial-map" class="w-full h-96 rounded-lg border-2 border-blue-200 bg-white"></div>
+                  <div class="mt-4 flex items-center gap-3">
+                    <button
+                      type="button"
+                      id="burial-map-save"
+                      class="px-6 py-2.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                      Сохранить координаты
+                    </button>
+                    <button
+                      type="button"
+                      id="burial-map-hide"
+                      class="px-4 py-2.5 bg-gray-500 text-white text-sm rounded-lg hover:bg-gray-600 transition-colors"
+                    >
+                      Скрыть карту
+                    </button>
+                    <div id="burial-map-saved" class="hidden text-sm text-green-600 font-medium">
+                      Координаты сохранены
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <input type="hidden" name="burial_latitude" id="burial_latitude" value={current.burial_latitude ?? ""} />
+              <input type="hidden" name="burial_longitude" id="burial_longitude" value={current.burial_longitude ?? ""} />
+            </section>
+
+            <section data-tab-panel="media" class="space-y-6 hidden">
+              <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-100">
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">Фотографии</h3>
+                <p class="text-sm text-gray-600 mb-4">Дополнительные фотографии из жизни (до 5 штук)</p>
+                <input type="file" name="media_photos" accept="image/*" multiple class="w-full px-4 py-3 bg-white border border-blue-200 rounded-lg" />
+              </div>
+
+              <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-100">
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">Видео</h3>
+                <p class="text-sm text-gray-600 mb-4">Видеозаписи из жизни (до 2 штук)</p>
+                <input type="file" name="media_videos" accept="video/*" multiple class="w-full px-4 py-3 bg-white border border-blue-200 rounded-lg" />
+              </div>
+            </section>
+
+            <section data-tab-panel="people" class="space-y-6 hidden">
+              <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                <h3 class="text-lg font-semibold text-slate-700 mb-4">Ваша связь</h3>
+                <div>
+                  <label for="creator_relationship" class="block text-sm font-medium text-gray-700 mb-2">
+                    Кто вы для {declineToGenitive(memorial?.first_name)}?
+                  </label>
+                  <select name="creator_relationship" id="creator_relationship" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <option value="">Выберите связь</option>
+                    <optgroup label="Семья">
+                      <option value="husband">Муж</option>
+                      <option value="wife">Жена</option>
+                      <option value="father">Отец</option>
+                      <option value="mother">Мать</option>
+                      <option value="son">Сын</option>
+                      <option value="daughter">Дочь</option>
+                      <option value="brother">Брат</option>
+                      <option value="sister">Сестра</option>
+                      <option value="grandfather">Дедушка</option>
+                      <option value="grandmother">Бабушка</option>
+                      <option value="grandson">Внук</option>
+                      <option value="granddaughter">Внучка</option>
+                      <option value="uncle">Дядя</option>
+                      <option value="aunt">Тетя</option>
+                      <option value="nephew">Племянник</option>
+                      <option value="niece">Племянница</option>
+                      <option value="relative">Родственник</option>
+                    </optgroup>
+                    <optgroup label="Другие связи">
+                      <option value="friend_male">Друг</option>
+                      <option value="friend_female">Подруга</option>
+                      <option value="colleague">Коллега</option>
+                      <option value="neighbor">Сосед</option>
+                      <option value="classmate">Одноклассник</option>
+                      <option value="coursemate">Однокурсник</option>
+                      <option value="other">Другое</option>
+                    </optgroup>
+                    <option value="not_specified">Не хочу указывать</option>
+                  </select>
+                </div>
+                
+                <div id="creator_relationship_custom_container" class="hidden mt-4">
+                  <label for="creator_relationship_custom" class="block text-sm font-medium text-gray-700 mb-2">
+                    Укажите вашу связь
+                  </label>
+                  <input 
+                    type="text" 
+                    name="creator_relationship_custom" 
+                    id="creator_relationship_custom"
+                    placeholder="Например: учитель, наставник, сват..."
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                
+                <p class="mt-3 text-xs text-gray-500">
+                  Эта информация поможет другим пользователям понять вашу связь с усопшим и будет отображаться рядом с вашими воспоминаниями
+                </p>
+              </div>
+
+              <div class="bg-white border border-gray-200 rounded-lg p-6">
+                <h3 class="text-lg font-semibold text-slate-700 mb-4">Близкие люди (<span id="people-count">0</span>)</h3>
+                <div id="people-list" class="space-y-3">
+                  <div class="text-center py-8 text-gray-400">
+                    <svg class="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                    </svg>
+                    <p class="text-sm">Загрузка...</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section data-tab-panel="settings" class="space-y-6 hidden">
+              <div class="space-y-3">
+                <label class="flex items-start gap-3 p-4 border border-gray-200 rounded-lg">
+                  <input type="radio" name="privacy" value="public" checked={current.privacy === "public" || !current.privacy} class="mt-1" />
+                  <span><span class="font-medium text-gray-900">Публичный мемориал</span><span class="block text-sm text-gray-500">Доступен всем пользователям</span></span>
+                </label>
+                <label class="flex items-start gap-3 p-4 border border-gray-200 rounded-lg">
+                  <input type="radio" name="privacy" value="family" checked={current.privacy === "family"} class="mt-1" />
+                  <span><span class="font-medium text-gray-900">Только для семьи и друзей</span><span class="block text-sm text-gray-500">Доступ по приглашению</span></span>
+                </label>
+                <label class="flex items-start gap-3 p-4 border border-gray-200 rounded-lg">
+                  <input type="radio" name="privacy" value="private" checked={current.privacy === "private"} class="mt-1" />
+                  <span><span class="font-medium text-gray-900">Приватный</span><span class="block text-sm text-gray-500">Доступен только вам</span></span>
+                </label>
+              </div>
+
+              <label class="flex items-start gap-3 p-4 border border-gray-200 rounded-lg">
+                <input type="checkbox" name="moderate_memories" value="1" checked={Boolean(current.moderate_memories)} class="mt-1" />
+                <span><span class="font-medium text-gray-900">Проверять воспоминания перед публикацией</span></span>
+              </label>
+
+              <label class="flex items-start gap-3 p-4 border border-gray-200 rounded-lg">
+                <input type="checkbox" name="allow_comments" value="1" checked={current.allow_comments !== false} class="mt-1" />
+                <span><span class="font-medium text-gray-900">Разрешить комментарии</span></span>
+              </label>
+
+              {mode === "create" && (
+                <label class="flex items-start gap-3 p-4 bg-amber-50 border border-amber-300 rounded-lg">
+                  <input type="checkbox" name="confirm_responsibility" required class="mt-1" />
+                  <span class="text-sm text-gray-800">Подтверждаю, что информация о человеке достоверна.</span>
+                </label>
+              )}
+            </section>
+
+            <section data-tab-panel="qrcode" class="space-y-6 hidden">
+              <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                <h4 class="font-semibold text-blue-900 mb-2">QR-код для памятника</h4>
+                {mode === "edit" && current.id ? (
+                  <>
+                    <p class="text-sm text-blue-800">Распечатайте QR-код и прикрепите его к памятнику.</p>
+                  </>
+                ) : (
+                  <p class="text-sm text-blue-800">QR-код станет доступен после сохранения мемориала.</p>
+                )}
+              </div>
+
+              {mode === "edit" && current.id ? (
+                <div class="grid md:grid-cols-2 gap-6">
+                  <div class="bg-gradient-to-br from-red-50 to-pink-50 border-2 border-red-100 rounded-xl p-6">
+                    <h4 class="text-lg font-semibold text-slate-700 mb-4">Превью QR-кода</h4>
+                    <div class="flex flex-col items-center">
+                      <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-sm border-4 border-white">
+                        <div class="text-center mb-6">
+                          <h3 class="text-3xl font-bold text-slate-700">Страница памяти</h3>
+                        </div>
+                        <div class="mb-6">
+                          <div id="qrcode" class="flex items-center justify-center"></div>
+                        </div>
+                        <div class="bg-gradient-to-r from-red-500 to-pink-500 text-white px-6 py-3 rounded-xl mb-4 text-center">
+                          <p class="text-lg font-bold">Отсканируйте QR-код</p>
+                        </div>
+                        <div class="text-center space-y-2 mb-4">
+                          <p class="text-base text-gray-700">
+                            чтобы оставить воспоминание<br />об этом человеке
+                          </p>
+                        </div>
+                        <div class="text-center">
+                          <p id="qr-host" class="text-xs text-gray-400 font-mono"></p>
+                        </div>
+                      </div>
+                      <div class="mt-4 flex items-center gap-2 text-sm text-gray-600 bg-white px-4 py-2 rounded-full shadow-sm">
+                        Так будет выглядеть ваш QR-код
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="space-y-4">
+                    <div class="bg-gradient-to-br from-red-500 to-pink-500 rounded-xl p-6 shadow-lg">
+                      <h4 class="text-lg font-semibold text-white mb-4">Скачать и распечатать</h4>
+                      <div class="space-y-3">
+                        <button
+                          type="button"
+                          id="qr-download-png"
+                          class="w-full flex items-center justify-center gap-2 px-6 py-3 bg-white hover:bg-gray-50 text-red-600 rounded-lg transition-all font-medium shadow-md"
+                        >
+                          Скачать PNG
+                        </button>
+                        <button
+                          type="button"
+                          id="qr-download-svg"
+                          class="w-full flex items-center justify-center gap-2 px-6 py-3 bg-white hover:bg-gray-50 text-red-600 rounded-lg transition-all font-medium shadow-md"
+                        >
+                          Скачать SVG
+                        </button>
+                        <button
+                          type="button"
+                          id="qr-print"
+                          class="w-full flex items-center justify-center gap-2 px-6 py-3 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-all font-medium border-2 border-white/50 hover:border-white"
+                        >
+                          Распечатать
+                        </button>
+                      </div>
+                      <p class="text-white/80 text-xs mt-4 text-center">Рекомендуем формат SVG для печати</p>
+                    </div>
+
+                    <div class="bg-white border-2 border-gray-200 rounded-xl p-6">
+                      <h4 class="text-lg font-semibold text-slate-700 mb-4">Инструкция по установке</h4>
+                      <div class="space-y-4 text-sm text-gray-600">
+                        <p>1. Скачайте или распечатайте QR-код.</p>
+                        <p>2. Защитите его от влаги (ламинация).</p>
+                        <p>3. Прикрепите на памятник.</p>
+                        <p>4. Проверьте сканированием с телефона.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+                  <h4 class="text-lg font-semibold text-yellow-900 mb-2">Сначала сохраните мемориал</h4>
+                  <p class="text-yellow-800">QR-код будет доступен после создания мемориала</p>
+                </div>
+              )}
+            </section>
+
+            <div id="memorial-form-message" class="hidden rounded-lg border p-4 text-sm">
+              <p id="memorial-form-message-title" class="font-semibold"></p>
+              <ul id="memorial-form-message-list" class="mt-2 list-disc space-y-1 pl-5"></ul>
+            </div>
+
+            <div class="flex gap-4 pt-6 border-t">
+              <button type="submit" id="memorial-draft" class="flex-1 px-6 py-3 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors font-medium">{submitLabel}</button>
+              <button type="button" id="memorial-publish" class="flex-1 px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors font-medium">{publishLabel}</button>
+            </div>
+          </form>
+        </div>
+      </main>
+
+      <aside class="lg:w-80 lg:sticky lg:top-4 lg:h-fit hidden lg:block">
+        <div class="bg-white rounded-xl shadow-md p-6">
+          <h2 class="text-lg font-semibold text-slate-700 mb-4">Разделы</h2>
+          <nav class="space-y-2">
+            <button type="button" data-tab-btn="basic" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left bg-red-50 text-gray-700">Основное</button>
+            <button type="button" data-tab-btn="biography" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-gray-600 hover:bg-gray-50">Биография</button>
+            <button type="button" data-tab-btn="burial" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-gray-600 hover:bg-gray-50">Захоронение</button>
+            <button type="button" data-tab-btn="media" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-gray-600 hover:bg-gray-50">Медиа</button>
+            <button type="button" data-tab-btn="people" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-gray-600 hover:bg-gray-50">Близкие люди</button>
+            <button type="button" data-tab-btn="settings" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-gray-600 hover:bg-gray-50">Настройки</button>
+            <button type="button" data-tab-btn="qrcode" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-gray-600 hover:bg-gray-50">QR-код</button>
+          </nav>
+        </div>
+      </aside>
+    </div>
+  </div>
+  <MemorialEditorIsland client:idle />
+</div>

@@ -1,0 +1,185 @@
+---
+import MainLayout from "../layouts/MainLayout.astro";
+import bundledProjectIcon from "../assets/memory-icon.png";
+
+const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
+const S3_BASE_URL = import.meta.env.PUBLIC_S3_BASE_URL ?? "https://s3.firstvds.ru/memory";
+const bundledProjectIconUrl = bundledProjectIcon.src;
+const PROJECT_ICON_URL_ENV = (import.meta.env.PUBLIC_PROJECT_ICON_URL ?? "").trim();
+const PROJECT_ICON_URL =
+  !PROJECT_ICON_URL_ENV || PROJECT_ICON_URL_ENV === "/brand/memory-icon.png"
+    ? bundledProjectIconUrl
+    : PROJECT_ICON_URL_ENV;
+
+// SSR-детекция авторизации по cookie, чтобы не мигал блок авторизации
+const cookieHeader = Astro.request.headers.get("cookie") ?? "";
+let isAuthed = false;
+let authUserName = "Пользователь";
+let authProfileHref = "/profile";
+
+if (cookieHeader) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/auth/me`, {
+      method: "GET",
+      headers: { cookie: cookieHeader },
+    });
+    if (res.ok) {
+      const me = await res.json().catch(() => null);
+      const id = Number(me?.id || 0);
+      if (id > 0) {
+        isAuthed = true;
+        authUserName = String(me?.name || "Пользователь");
+        authProfileHref = `/user/id${id}`;
+      }
+    }
+  } catch {
+    // игнорируем ошибки, считаем, что пользователь не авторизован
+  }
+}
+
+let stats = { photos: 0, memorials: 0, users: 0, memories: 0 };
+let recentMemorials = [];
+
+try {
+  const res = await fetch(`${API_BASE_URL}/memorials/home`);
+  if (res.ok) {
+    const data = await res.json();
+    stats = {
+      photos: Number(data?.stats?.photos ?? 0),
+      memorials: Number(data?.stats?.memorials ?? 0),
+      users: Number(data?.stats?.users ?? 0),
+      memories: Number(data?.stats?.memories ?? 0),
+    };
+    recentMemorials = Array.isArray(data?.recentMemorials) ? data.recentMemorials : [];
+  }
+} catch {
+  // ignore
+}
+
+function resolvePhoto(path) {
+  if (!path) return null;
+  if (path.startsWith("http://") || path.startsWith("https://")) return path;
+  return `${S3_BASE_URL.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
+}
+---
+
+<MainLayout title="Страницы памяти — цифровые страницы памяти о близких">
+  <div class="bg-gray-200">
+    <div class="container mx-auto px-3 sm:px-4 pt-4 sm:pt-6 pb-10 sm:pb-16">
+      <section class="mb-10 sm:mb-14">
+        <div class="relative overflow-hidden rounded-2xl border border-slate-300 bg-slate-800 shadow-xl animate-fade-in">
+          <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(56,189,248,0.15),_transparent_44%),radial-gradient(circle_at_bottom_left,_rgba(148,163,184,0.2),_transparent_50%),linear-gradient(135deg,_#1e293b_0%,_#111827_60%,_#0b1120_100%)]"></div>
+          <div class="relative z-10 px-5 py-8 sm:px-10 sm:py-12">
+            <div class="mx-auto max-w-4xl text-center">
+              <img
+                src={PROJECT_ICON_URL}
+                alt="Страницы памяти"
+                class="mx-auto mb-4 h-10 w-10 rounded-md object-contain sm:mb-5 sm:h-11 sm:w-11"
+                width="44"
+                height="44"
+                loading="eager"
+                decoding="async"
+                fetchpriority="high"
+              />
+              <h1 class="mb-3 text-3xl font-bold leading-tight text-white sm:text-5xl">Память о близких</h1>
+              <p class="mx-auto max-w-3xl text-base leading-relaxed text-slate-200 sm:text-xl">Сохраните драгоценные воспоминания о ваших близких для будущих поколений</p>
+            </div>
+
+            <div
+              data-auth="authed"
+              class={`mx-auto mt-7 max-w-3xl rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur-sm sm:mt-8 sm:p-5 ${isAuthed ? "" : "hidden"}`}
+            >
+              <div class="flex flex-col items-center gap-3 text-center sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:text-left">
+                <div class="sm:flex-1">
+                  <p class="text-xs font-semibold uppercase tracking-wide text-slate-300">Ваш профиль</p>
+                  <h2 class="mt-1 text-xl font-semibold text-white sm:text-2xl">
+                    С возвращением, <span data-user-name>{authUserName}</span>
+                  </h2>
+                  <p class="mt-1 text-sm text-slate-200 sm:text-base">Продолжите работу со страницами памяти.</p>
+                </div>
+                <a
+                  href={authProfileHref}
+                  data-user-profile-link
+                  class="inline-flex items-center justify-center whitespace-nowrap rounded-lg bg-red-500 px-8 py-3 font-medium text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-red-600 hover:shadow-lg sm:shrink-0"
+                >
+                  Открыть профиль
+                </a>
+              </div>
+            </div>
+
+            <div
+              data-auth="anon"
+              class={`mx-auto mt-7 max-w-3xl rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur-sm sm:mt-8 sm:p-5 ${isAuthed ? "hidden" : ""}`}
+            >
+              <p class="mb-4 text-center text-sm text-slate-200 sm:text-base">Создайте страницу памяти и пригласите родных делиться воспоминаниями</p>
+              <div class="flex flex-col justify-center gap-3 sm:flex-row">
+                <a href="/login#register" class="inline-flex items-center justify-center gap-2 rounded-lg bg-red-500 px-5 py-3 font-medium text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-red-600 hover:shadow-lg">Регистрация</a>
+                <a href="/login" class="inline-flex items-center justify-center gap-2 rounded-lg border border-red-400 bg-white/5 px-5 py-3 font-medium text-red-200 transition-all duration-300 hover:-translate-y-0.5 hover:bg-red-500 hover:text-white hover:shadow-lg">Войти</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="mb-10 sm:mb-16">
+        <div class="overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-md">
+          <div class="flex items-center gap-3 border-b border-slate-700 bg-slate-700 px-5 py-4 sm:px-6">
+            <h2 class="text-lg font-semibold text-white sm:text-xl">Статистика</h2>
+          </div>
+          <div class="p-4 sm:p-6">
+            <div class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+              <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-center shadow-sm"><div class="mb-2 text-sm text-gray-500">Фотографий</div><div class="text-xl font-semibold leading-none text-slate-700 sm:text-2xl">{stats.photos}</div></div>
+              <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-center shadow-sm"><div class="mb-2 text-sm text-gray-500">Страниц памяти</div><div class="text-xl font-semibold leading-none text-slate-700 sm:text-2xl">{stats.memorials}</div></div>
+              <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-center shadow-sm"><div class="mb-2 text-sm text-gray-500">Пользователей</div><div class="text-xl font-semibold leading-none text-slate-700 sm:text-2xl">{stats.users}</div></div>
+              <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-center shadow-sm"><div class="mb-2 text-sm text-gray-500">Воспоминаний</div><div class="text-xl font-semibold leading-none text-slate-700 sm:text-2xl">{stats.memories}</div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-md">
+          <div class="flex items-center gap-3 border-b border-slate-700 bg-slate-700 px-5 py-4 sm:px-6">
+            <h2 class="text-lg font-semibold text-white sm:text-xl">Последние страницы памяти</h2>
+          </div>
+          <div class="p-4 sm:p-6">
+            {recentMemorials.length > 0 ? (
+              <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {recentMemorials.map((memorial) => {
+                  const photo = resolvePhoto(memorial.photo);
+                  return (
+                    <a href={`/memorial/id${memorial.id}`} class="rounded-xl border border-slate-200 bg-slate-50 overflow-hidden hover:shadow-md transition-shadow">
+                      <div class="aspect-[4/3] bg-gray-200 flex items-center justify-center overflow-hidden">
+                        {photo ? (
+                          <img
+                            src={photo}
+                            alt={`${memorial.first_name} ${memorial.last_name}`}
+                            class="w-full h-full object-cover"
+                            width="800"
+                            height="600"
+                            loading="lazy"
+                            decoding="async"
+                            fetchpriority="low"
+                          />
+                        ) : (
+                          <span class="text-gray-500 text-sm">Нет фото</span>
+                        )}
+                      </div>
+                      <div class="p-4">
+                        <h3 class="font-semibold text-slate-800 mb-1">{memorial.last_name} {memorial.first_name} {memorial.middle_name ?? ""}</h3>
+                        <p class="text-sm text-gray-600">{memorial.birth_date ?? "—"} — {memorial.death_date ?? "—"}</p>
+                        <p class="text-xs text-gray-500 mt-2">Воспоминаний: {memorial.memories_count ?? 0}</p>
+                      </div>
+                    </a>
+                  );
+                })}
+              </div>
+            ) : (
+              <div class="rounded-xl border border-slate-200 bg-slate-50 p-8 text-center text-gray-500">Пока нет опубликованных страниц памяти.</div>
+            )}
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</MainLayout>

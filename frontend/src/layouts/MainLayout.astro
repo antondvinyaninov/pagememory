@@ -1,0 +1,741 @@
+---
+import "../styles/global.css";
+import bundledProjectIcon from "../assets/memory-icon.png";
+
+interface Props {
+  title?: string;
+  description?: string;
+  metaTitle?: string;
+  metaDescription?: string;
+  metaImage?: string;
+  metaImageSmall?: string; // Маленькое изображение для summary card
+  metaImageWidth?: number; // Ширина изображения
+  metaImageHeight?: number; // Высота изображения
+  metaType?: string;
+  meta?: any;
+}
+
+type LayoutAuthUser = {
+  id: number;
+  name: string;
+  email: string;
+  avatar?: string | null;
+};
+
+const {
+  title = import.meta.env.PUBLIC_SITE_NAME ?? "Страницы памяти",
+  description = "Цифровые страницы памяти о близких",
+  metaTitle,
+  metaDescription,
+  metaImage,
+  metaImageSmall,
+  metaImageWidth,
+  metaImageHeight,
+  metaType,
+} = Astro.props as Props;
+
+const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
+const S3_BASE_URL = import.meta.env.PUBLIC_S3_BASE_URL ?? "https://s3.firstvds.ru/memory";
+const SITE_NAME = import.meta.env.PUBLIC_SITE_NAME ?? "Страницы памяти";
+const bundledProjectIconUrl = bundledProjectIcon.src;
+const PROJECT_ICON_URL_ENV = (import.meta.env.PUBLIC_PROJECT_ICON_URL ?? "").trim();
+const PROJECT_ICON_URL =
+  !PROJECT_ICON_URL_ENV || PROJECT_ICON_URL_ENV === "/brand/memory-icon.png"
+    ? bundledProjectIconUrl
+    : PROJECT_ICON_URL_ENV;
+const GTM_ID = import.meta.env.PUBLIC_GTM_ID ?? "";
+
+const computedMetaDescription = (metaDescription ?? description ?? "").trim() || "Цифровые страницы памяти о близких";
+const computedMetaTitle = (metaTitle ?? title ?? SITE_NAME).trim() || SITE_NAME;
+const computedMetaImage = typeof metaImage === "string" ? metaImage.trim() || PROJECT_ICON_URL : PROJECT_ICON_URL;
+const computedMetaImageSmall = typeof metaImageSmall === "string" ? metaImageSmall.trim() || computedMetaImage : computedMetaImage;
+const computedMetaType = (metaType ?? "website").trim() || "website";
+
+// Размеры изображения для Open Graph (по умолчанию для summary_large_image)
+// Если не указаны, используем стандартные размеры для соцсетей
+const ogImageWidth = metaImageWidth || 1200;
+const ogImageHeight = metaImageHeight || 630;
+
+function resolveS3UrlServer(path: string | null | undefined): string | null {
+  if (!path) return null;
+  const trimmed = String(path).trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+  return `${S3_BASE_URL.replace(/\/$/, "")}/${trimmed.replace(/^\//, "")}`;
+}
+
+function resolveAvatarUrlServer(user: LayoutAuthUser | null): string {
+  const fromDb = resolveS3UrlServer(user?.avatar ?? null);
+  if (fromDb) return fromDb;
+  const name = String(user?.name || "").trim();
+  if (!name) return "https://ui-avatars.com/api/?name=User&size=128&background=e3f2fd&color=1976d2&bold=true";
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=128&background=e3f2fd&color=1976d2&bold=true`;
+}
+
+const cookieHeader = Astro.request.headers.get("cookie") ?? "";
+let initialAuthUser: LayoutAuthUser | null = null;
+
+if (cookieHeader) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/auth/me`, {
+      method: "GET",
+      headers: { cookie: cookieHeader },
+    });
+    if (res.ok) {
+      const me = await res.json().catch(() => null);
+      const id = Number(me?.id || 0);
+      if (id > 0) {
+        initialAuthUser = {
+          id,
+          name: String(me?.name || ""),
+          email: String(me?.email || ""),
+          avatar: typeof me?.avatar === "string" ? me.avatar : null,
+        };
+      }
+    }
+  } catch {
+    initialAuthUser = null;
+  }
+}
+
+const initialIsAuthed = Boolean(initialAuthUser?.id);
+const initialProfileHref = initialIsAuthed ? `/user/id${initialAuthUser?.id}` : "/login";
+const initialAvatarUrl = initialIsAuthed ? resolveAvatarUrlServer(initialAuthUser) : "";
+
+let apiOrigin = "";
+let s3Origin = "";
+try {
+  apiOrigin = new URL(API_BASE_URL).origin;
+} catch {
+  apiOrigin = "";
+}
+try {
+  s3Origin = new URL(S3_BASE_URL).origin;
+} catch {
+  s3Origin = "";
+}
+---
+
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={computedMetaDescription} />
+
+    <meta property="og:site_name" content={SITE_NAME} />
+    <meta property="og:title" content={computedMetaTitle} />
+    <meta property="og:description" content={computedMetaDescription} />
+    <meta property="og:type" content={computedMetaType} />
+    <meta property="og:url" content={Astro.url.toString()} />
+    {/* Большое изображение для Open Graph (1200x630 для Facebook, LinkedIn) */}
+    <meta property="og:image" content={computedMetaImage} />
+    <meta property="og:image:width" content={String(ogImageWidth)} />
+    <meta property="og:image:height" content={String(ogImageHeight)} />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:alt" content={computedMetaTitle} />
+
+    {/* Twitter Cards - используем большое изображение для summary_large_image */}
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={computedMetaTitle} />
+    <meta name="twitter:description" content={computedMetaDescription} />
+    <meta name="twitter:image" content={computedMetaImage} />
+    {/* Маленькое изображение для summary card (если нужно переключиться) */}
+    {computedMetaImageSmall !== computedMetaImage && (
+      <meta name="twitter:image:small" content={computedMetaImageSmall} />
+    )}
+
+    <link rel="icon" type="image/png" sizes="32x32" href={PROJECT_ICON_URL} />
+    <link rel="icon" type="image/png" sizes="16x16" href={PROJECT_ICON_URL} />
+    <link rel="apple-touch-icon" sizes="180x180" href={PROJECT_ICON_URL} />
+    <link rel="shortcut icon" href={PROJECT_ICON_URL} />
+    {apiOrigin && <link rel="preconnect" href={apiOrigin} crossorigin="anonymous" />}
+    {s3Origin && <link rel="preconnect" href={s3Origin} crossorigin="anonymous" />}
+    <style is:global>
+      body[data-authenticated="1"] [data-auth="anon"] { display: none !important; }
+      body[data-authenticated="0"] [data-auth="authed"] { display: none !important; }
+    </style>
+    <script is:inline>
+      // Ранний перехват fetch и console для подавления 401 ошибок /auth/me
+      (function() {
+        // Перехватываем fetch ДО загрузки страницы
+        const originalFetch = window.fetch;
+        window.fetch = function(...args) {
+          const url = typeof args[0] === 'string' ? args[0] : (args[0]?.url || '');
+          const isAuthMe = url.includes('/auth/me');
+          
+          const promise = originalFetch.apply(this, args);
+          
+          // Для /auth/me подавляем логирование ошибок
+          if (isAuthMe) {
+            return promise.catch((error) => {
+              // Подавляем ошибки сети - возвращаем фейковый 401 response
+              return new Response(JSON.stringify({}), {
+                status: 401,
+                statusText: 'Unauthorized',
+                headers: { 'Content-Type': 'application/json' }
+              });
+            });
+          }
+          
+          return promise;
+        };
+        
+        // Перехватываем все методы console для подавления логов
+        ['error', 'warn', 'log', 'info'].forEach((method) => {
+          const original = console[method];
+          console[method] = function(...args) {
+            const message = String(args.join(' ')).toLowerCase();
+            if (message.includes('401') && message.includes('/auth/me')) return;
+            if (message.includes('unauthorized') && message.includes('/auth/me')) return;
+            original.apply(console, args);
+          };
+        });
+      })();
+    </script>
+
+    {GTM_ID && (
+      <script
+        set:html={`(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','${GTM_ID}');`}
+      />
+    )}
+  </head>
+  <body
+    class="min-h-screen flex flex-col bg-gray-200"
+    data-authenticated={initialIsAuthed ? "1" : "0"}
+    data-auth-user-id={initialAuthUser ? String(initialAuthUser.id) : ""}
+    data-auth-user-name={initialAuthUser?.name ?? ""}
+    data-auth-user-email={initialAuthUser?.email ?? ""}
+    data-auth-user-avatar={initialAvatarUrl}
+  >
+    {GTM_ID && (
+      <noscript>
+        <iframe
+          src={`https://www.googletagmanager.com/ns.html?id=${GTM_ID}`}
+          height="0"
+          width="0"
+          style="display:none;visibility:hidden"
+        ></iframe>
+      </noscript>
+    )}
+
+    <header class="mb-0 bg-gray-200">
+      <div class="container mx-auto px-3 sm:px-4 pt-4">
+        <div class="relative rounded-2xl border border-slate-700 bg-slate-800 shadow-xl overflow-visible">
+          <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(56,189,248,0.15),_transparent_44%),radial-gradient(circle_at_bottom_left,_rgba(148,163,184,0.2),_transparent_50%),linear-gradient(135deg,_#1e293b_0%,_#111827_60%,_#0b1120_100%)] rounded-2xl"></div>
+
+          <div class="relative py-3 sm:py-0">
+            <div class="flex items-center justify-between sm:grid sm:grid-cols-3 sm:items-center sm:h-16 sm:gap-4">
+              {/* Логотип слева */}
+              <div class="flex items-center px-4 sm:px-6">
+                <a href="/" class="flex items-center gap-2 text-lg sm:text-xl font-bold text-white transition-colors hover:text-sky-200">
+                  <img
+                    src={PROJECT_ICON_URL}
+                    alt={SITE_NAME}
+                    class="h-7 w-7 rounded-md object-contain"
+                    width="28"
+                    height="28"
+                    loading="eager"
+                    decoding="async"
+                  />
+                  <span class="inline max-w-[120px] sm:max-w-[180px] lg:max-w-[220px] truncate text-sm sm:text-base">
+                    {SITE_NAME}
+                  </span>
+                  <span class="ml-2 hidden sm:inline-flex items-center rounded-full border border-slate-400 bg-slate-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-100">
+                    beta
+                  </span>
+                </a>
+              </div>
+
+              {/* Поиск по центру */}
+              <div class="hidden sm:flex justify-center">
+                <div class="w-full max-w-xl relative">
+                  <label for="header-search" class="sr-only">Поиск страниц памяти</label>
+                  <div class="relative">
+                    <svg class="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                    <input
+                      id="header-search"
+                      type="text"
+                      placeholder="Найдите страницу памяти: ФИО, годы жизни или город"
+                      class="w-full rounded-card border border-slate-300 bg-white py-1.5 pl-9 pr-8 text-slate-800 placeholder:text-gray-400 shadow-sm focus:border-sky-400 focus:outline-none focus:ring-1 focus:ring-sky-400"
+                      autocomplete="off"
+                    />
+                  </div>
+                  {/* Выпадающий список подсказок */}
+                  <div
+                    id="header-search-results"
+                    class="hidden absolute top-full left-0 right-0 mt-1 max-h-96 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-xl z-50"
+                  ></div>
+                </div>
+              </div>
+
+              {/* Навигация справа */}
+              <nav class="flex items-center justify-end px-4 sm:px-6">
+                <button
+                  type="button"
+                  data-mobile-search-toggle
+                  class="sm:hidden mr-2 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-white transition-colors hover:bg-white/20"
+                  aria-label="Открыть поиск"
+                  aria-expanded="false"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                  </svg>
+                </button>
+
+                <a
+                  href="/login"
+                  data-auth="anon"
+                  class="whitespace-nowrap rounded border border-red-400/70 bg-red-500 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-red-600 sm:px-4 sm:text-base"
+                >
+                  Вход
+                </a>
+
+                {/* user dropdown (показываем, когда авторизованы) */}
+                <div class="relative" data-auth="authed" style="z-index: 9999;">
+                  <button
+                    type="button"
+                    data-user-menu-btn
+                    class="flex items-center gap-2 text-white transition-colors hover:text-sky-200"
+                  >
+                    <img
+                      data-user-avatar
+                      src={initialAvatarUrl}
+                      alt={initialAuthUser?.name ?? ""}
+                      class="h-10 w-10 rounded-full border-2 border-white/20 object-cover"
+                    />
+                  </button>
+
+                  <div
+                    data-user-menu
+                    class="hidden absolute right-0 mt-2 w-48 rounded-lg bg-white py-2 shadow-xl border border-gray-200"
+                    style="z-index: 9999;"
+                  >
+                    <div class="px-4 py-2 border-b border-gray-200">
+                      <p class="text-sm font-medium text-gray-900 truncate" data-user-name>{initialAuthUser?.name ?? ""}</p>
+                      <p class="text-xs text-gray-500 truncate" data-user-email>{initialAuthUser?.email ?? ""}</p>
+                    </div>
+                    <a
+                      href={initialProfileHref}
+                      data-user-profile-link
+                      class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                    >
+                      Профиль
+                    </a>
+                    <button
+                      type="button"
+                      data-auth-logout
+                      class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 transition-colors"
+                    >
+                      Выйти
+                    </button>
+                  </div>
+                </div>
+              </nav>
+            </div>
+
+            <div data-mobile-search-panel class="hidden sm:hidden px-4 pb-3">
+              <label for="header-search-mobile" class="sr-only">Поиск страниц памяти</label>
+              <div class="relative">
+                <svg class="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+                <input
+                  id="header-search-mobile"
+                  type="text"
+                  placeholder="Поиск страницы памяти"
+                  class="w-full rounded-card border border-slate-300 bg-white py-1.5 pl-9 pr-3 text-sm text-slate-800 placeholder:text-gray-400 shadow-sm focus:border-sky-400 focus:outline-none focus:ring-1 focus:ring-sky-400"
+                  autocomplete="off"
+                />
+                {/* Выпадающий список подсказок для мобильной версии */}
+                <div
+                  id="header-search-results-mobile"
+                  class="hidden absolute top-full left-0 right-0 mt-1 max-h-96 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-xl z-50"
+                ></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="flex-1">
+      <slot />
+    </main>
+
+    <footer class="bg-slate-700 text-white py-4 mt-16">
+      <div class="container mx-auto px-4">
+        <div
+          class="flex flex-col sm:flex-row justify-between items-center gap-2"
+        >
+          <div class="flex items-center gap-2">
+            <img
+              src={PROJECT_ICON_URL}
+              alt={SITE_NAME}
+              class="w-5 h-5 rounded-sm object-contain"
+              width="20"
+              height="20"
+              loading="lazy"
+              decoding="async"
+            />
+            <p class="text-sm text-center sm:text-left">
+              © 2025 Страницы памяти. Создано с ❤️ для сохранения важных
+              моментов.
+            </p>
+          </div>
+          <p class="text-sm text-white/70">
+            Сохраните память о близких для будущих поколений
+          </p>
+        </div>
+      </div>
+    </footer>
+
+           <script define:vars={{ API_BASE_URL }}>
+             const S3_BASE_URL = (window.__S3_BASE_URL__ || null);
+
+             // Подавляем логирование 401 ошибок для /auth/me в консоли
+             (function() {
+               const originalFetch = window.fetch;
+               window.fetch = function(...args) {
+                 const url = typeof args[0] === 'string' ? args[0] : (args[0]?.url || '');
+                 const isAuthMe = url.includes('/auth/me');
+                 
+                 return originalFetch.apply(this, args)
+                   .then((response) => {
+                     // Для 401 на /auth/me возвращаем response без логирования
+                     if (response.status === 401 && isAuthMe) {
+                       return response;
+                     }
+                     // Для других ошибок проверяем, нужно ли логировать
+                     if (!response.ok && isAuthMe) {
+                       return response;
+                     }
+                     return response;
+                   })
+                   .catch((error) => {
+                     // Подавляем ошибки сети для /auth/me
+                     if (isAuthMe) {
+                       // Возвращаем фейковый response с 401, чтобы не ломать логику
+                       return new Response(JSON.stringify({}), {
+                         status: 401,
+                         statusText: 'Unauthorized',
+                         headers: { 'Content-Type': 'application/json' }
+                       });
+                     }
+                     throw error;
+                   });
+               };
+             })();
+
+             // Подавляем логирование в консоли для 401 ошибок /auth/me
+             (function() {
+               // Перехватываем все методы логирования
+               const methods = ['error', 'warn', 'log'];
+               methods.forEach((method) => {
+                 const original = console[method];
+                 console[method] = function(...args) {
+                   const message = args.join(' ').toLowerCase();
+                   // Пропускаем сообщения об ошибках 401 для /auth/me
+                   if (message.includes('401') && message.includes('/auth/me')) {
+                     return;
+                   }
+                   if (message.includes('unauthorized') && message.includes('/auth/me')) {
+                     return;
+                   }
+                   original.apply(console, args);
+                 };
+               });
+             })();
+
+             function resolveS3Url(path) {
+               if (!path) return null;
+               if (typeof path !== "string") return null;
+               const trimmed = path.trim();
+               if (!trimmed) return null;
+               if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+               const base = (S3_BASE_URL || "").trim() || "https://s3.firstvds.ru/memory";
+               return `${base.replace(/\/$/, "")}/${trimmed.replace(/^\//, "")}`;
+             }
+
+             function resolveAvatarUrl(user) {
+               const fromDb = resolveS3Url(user?.avatar || null);
+               if (fromDb) return fromDb;
+               const name = String(user?.name || "").trim();
+               if (!name) return "https://ui-avatars.com/api/?name=User&size=128&background=e3f2fd&color=1976d2&bold=true";
+               return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&size=128&background=e3f2fd&color=1976d2&bold=true`;
+             }
+
+             async function updateAuthHeader() {
+               const anonEls = document.querySelectorAll('[data-auth="anon"]');
+               const authedEls = document.querySelectorAll('[data-auth="authed"]');
+
+               try {
+                 const res = await fetch(`${API_BASE_URL}/auth/me`, {
+                   method: "GET",
+                   credentials: "include",
+                 });
+                 
+                 let me = null;
+                 if (res.ok) {
+                   try {
+                     me = await res.json();
+                     // Проверяем, что me не null и имеет id (бэкенд возвращает null для неавторизованных)
+                     if (!me || !me.id) {
+                       me = null;
+                     }
+                   } catch {}
+                 }
+                 
+                 const authed = me !== null && me.id;
+
+                 anonEls.forEach((el) => el.classList.toggle("hidden", authed));
+                 authedEls.forEach((el) => el.classList.toggle("hidden", !authed));
+
+                 if (authed && me) {
+                   const nameEls = document.querySelectorAll("[data-user-name]");
+                   const emailEls = document.querySelectorAll("[data-user-email]");
+                   const avatarEls = document.querySelectorAll("[data-user-avatar]");
+                   const profileLinks = document.querySelectorAll("[data-user-profile-link]");
+
+                   nameEls.forEach((el) => {
+                     el.textContent = me?.name ?? "";
+                   });
+
+                   emailEls.forEach((el) => {
+                     el.textContent = me?.email ?? "";
+                   });
+
+                   avatarEls.forEach((el) => {
+                     if (el instanceof HTMLImageElement) {
+                       el.src = resolveAvatarUrl(me);
+                       el.alt = me?.name ?? "User";
+                     }
+                   });
+
+                   profileLinks.forEach((link) => {
+                     if (link instanceof HTMLAnchorElement) {
+                       link.href = `/user/id${me?.id}`;
+                     }
+                   });
+                 }
+               } catch (error) {
+                 // Игнорируем ошибки сети - это нормально
+                 // Для неавторизованных пользователей показываем кнопку "Вход"
+                 anonEls.forEach((el) => el.classList.remove("hidden"));
+                 authedEls.forEach((el) => el.classList.add("hidden"));
+               }
+             }
+
+             async function logout() {
+               try {
+                 await fetch(`${API_BASE_URL}/auth/logout`, {
+                   method: "POST",
+                   credentials: "include",
+                 });
+               } finally {
+                 window.location.href = "/login";
+               }
+             }
+
+             document.addEventListener("DOMContentLoaded", () => {
+               const mobileSearchToggle = document.querySelector("[data-mobile-search-toggle]");
+               const mobileSearchPanel = document.querySelector("[data-mobile-search-panel]");
+               if (mobileSearchToggle && mobileSearchPanel) {
+                 const setMobileSearchVisible = (visible) => {
+                   mobileSearchPanel.classList.toggle("hidden", !visible);
+                   mobileSearchToggle.setAttribute("aria-expanded", visible ? "true" : "false");
+                 };
+                 mobileSearchToggle.addEventListener("click", () => {
+                   const visible = mobileSearchPanel.classList.contains("hidden");
+                   setMobileSearchVisible(visible);
+                 });
+               }
+
+               // dropdown (как в Laravel)
+               const btn = document.querySelector("[data-user-menu-btn]");
+               const menu = document.querySelector("[data-user-menu]");
+               if (btn && menu) {
+                 btn.addEventListener("click", (event) => {
+                   event.stopPropagation();
+                   menu.classList.toggle("hidden");
+                 });
+                 document.addEventListener("click", (event) => {
+                   const clickedInside = menu.contains(event.target);
+                   const clickedBtn = btn.contains(event.target);
+                   if (!clickedInside && !clickedBtn && !menu.classList.contains("hidden")) {
+                     menu.classList.add("hidden");
+                   }
+                 });
+               }
+
+               document.querySelectorAll("[data-auth-logout]").forEach((btn) => {
+                 btn.addEventListener("click", logout);
+               });
+               updateAuthHeader();
+
+               // Инициализация поиска
+               const initSearch = () => {
+                 const S3_BASE_URL = (window.__S3_BASE_URL__ || "https://s3.firstvds.ru/memory").trim();
+                 
+                 const resolvePhotoUrl = (photo) => {
+                   if (!photo) return "https://ui-avatars.com/api/?name=Memorial&size=128&background=e3f2fd&color=1976d2&bold=true";
+                   if (photo.startsWith("http://") || photo.startsWith("https://")) return photo;
+                   return `${S3_BASE_URL.replace(/\/$/, "")}/${photo.replace(/^\//, "")}`;
+                 };
+
+                 const formatDate = (dateStr) => {
+                   if (!dateStr) return "";
+                   try {
+                     const date = new Date(dateStr);
+                     const day = String(date.getDate()).padStart(2, "0");
+                     const month = String(date.getMonth() + 1).padStart(2, "0");
+                     const year = date.getFullYear();
+                     return `${day}.${month}.${year}`;
+                   } catch {
+                     return "";
+                   }
+                 };
+
+                 const formatFIO = (first, last, middle) => {
+                   const parts = [last, first, middle].filter(Boolean);
+                   return parts.join(" ") || "Без имени";
+                 };
+
+                 const renderResults = (results, container) => {
+                   if (!results || results.length === 0) {
+                     container.innerHTML = '<div class="px-4 py-3 text-sm text-gray-500">Ничего не найдено</div>';
+                     container.classList.remove("hidden");
+                     return;
+                   }
+
+                   const html = results.map((memorial) => {
+                     const photoUrl = resolvePhotoUrl(memorial.photo);
+                     const fio = formatFIO(memorial.first_name, memorial.last_name, memorial.middle_name);
+                     const birthDate = formatDate(memorial.birth_date);
+                     const deathDate = formatDate(memorial.death_date);
+                     const dates = [birthDate, deathDate].filter(Boolean).join(" — ") || "Даты не указаны";
+                     
+                     return `
+                       <a
+                         href="/memorial/id${memorial.id}"
+                         class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0"
+                       >
+                         <img
+                           src="${photoUrl}"
+                           alt="${fio}"
+                           class="w-12 h-12 rounded-lg object-cover flex-shrink-0"
+                           loading="lazy"
+                         />
+                         <div class="min-w-0 flex-1">
+                           <div class="font-medium text-gray-900 truncate">${fio}</div>
+                           <div class="text-sm text-gray-500">${dates}</div>
+                         </div>
+                       </a>
+                     `;
+                   }).join("");
+
+                   container.innerHTML = html;
+                   container.classList.remove("hidden");
+                 };
+
+                 const searchMemorials = async (query, container) => {
+                   if (!query || query.length < 2) {
+                     container.classList.add("hidden");
+                     return;
+                   }
+
+                   try {
+                     const res = await fetch(`${API_BASE_URL}/memorials/search?q=${encodeURIComponent(query)}&limit=10`);
+                     if (!res.ok) {
+                       container.classList.add("hidden");
+                       return;
+                     }
+                     const data = await res.json();
+                     renderResults(data.results || [], container);
+                   } catch (error) {
+                     console.error("Search error:", error);
+                     container.classList.add("hidden");
+                   }
+                 };
+
+                 // Дебаунс для поиска
+                 let searchTimeout = null;
+                 const debouncedSearch = (query, container) => {
+                   if (searchTimeout) {
+                     clearTimeout(searchTimeout);
+                   }
+                   searchTimeout = setTimeout(() => {
+                     searchMemorials(query, container);
+                   }, 300);
+                 };
+
+                 // Обработка поиска для десктопа
+                 const desktopInput = document.getElementById("header-search");
+                 const desktopResults = document.getElementById("header-search-results");
+                 if (desktopInput && desktopResults) {
+                   desktopInput.addEventListener("input", (e) => {
+                     const query = e.target.value.trim();
+                     debouncedSearch(query, desktopResults);
+                   });
+
+                   desktopInput.addEventListener("blur", () => {
+                     // Закрываем результаты с небольшой задержкой, чтобы клик по ссылке успел сработать
+                     setTimeout(() => {
+                       desktopResults.classList.add("hidden");
+                     }, 200);
+                   });
+
+                   desktopInput.addEventListener("focus", () => {
+                     const query = desktopInput.value.trim();
+                     if (query.length >= 2) {
+                       searchMemorials(query, desktopResults);
+                     }
+                   });
+                 }
+
+                 // Обработка поиска для мобильной версии
+                 const mobileInput = document.getElementById("header-search-mobile");
+                 const mobileResults = document.getElementById("header-search-results-mobile");
+                 if (mobileInput && mobileResults) {
+                   mobileInput.addEventListener("input", (e) => {
+                     const query = e.target.value.trim();
+                     debouncedSearch(query, mobileResults);
+                   });
+
+                   mobileInput.addEventListener("blur", () => {
+                     setTimeout(() => {
+                       mobileResults.classList.add("hidden");
+                     }, 200);
+                   });
+
+                   mobileInput.addEventListener("focus", () => {
+                     const query = mobileInput.value.trim();
+                     if (query.length >= 2) {
+                       searchMemorials(query, mobileResults);
+                     }
+                   });
+                 }
+
+                 // Закрытие результатов при клике вне
+                 document.addEventListener("click", (e) => {
+                   if (desktopResults && !desktopInput.contains(e.target) && !desktopResults.contains(e.target)) {
+                     desktopResults.classList.add("hidden");
+                   }
+                   if (mobileResults && !mobileInput.contains(e.target) && !mobileResults.contains(e.target)) {
+                     mobileResults.classList.add("hidden");
+                   }
+                 });
+               };
+
+               initSearch();
+             });
+           </script>
+  </body>
+</html>

@@ -1,0 +1,32 @@
+---
+import MainLayout from "../../../layouts/MainLayout.astro";
+import MemorialEditorForm from "../../../components/MemorialEditorForm.astro";
+
+const { id } = Astro.params;
+const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
+
+let memorial = null;
+let error = "";
+
+if (id) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/memorials/${id}`);
+    if (res.ok) {
+      memorial = await res.json();
+    } else {
+      error = `Не удалось загрузить мемориал (код ${res.status})`;
+    }
+  } catch {
+    error = "Ошибка подключения к API мемориалов";
+  }
+}
+---
+
+<MainLayout title={memorial ? `Редактирование: ${memorial.last_name} ${memorial.first_name}` : "Редактировать мемориал"}>
+  {error && (
+    <div class="container mx-auto px-4 pt-4">
+      <div class="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-700">{error}</div>
+    </div>
+  )}
+  <MemorialEditorForm mode="edit" memorial={memorial} />
+</MainLayout>

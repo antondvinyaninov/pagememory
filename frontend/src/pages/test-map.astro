@@ -1,0 +1,46 @@
+---
+import MainLayout from "../layouts/MainLayout.astro";
+---
+
+<MainLayout title="Тест Яндекс.Карты">
+  <div class="container mx-auto px-4 py-6">
+    <div class="bg-white rounded-xl border border-slate-300 shadow-md p-6">
+      <h1 class="text-2xl font-bold text-slate-800 mb-2">Тест Яндекс.Карты</h1>
+      <p class="text-sm text-gray-600 mb-4">Кликните по карте, чтобы поставить метку.</p>
+
+      <div id="map" class="w-full h-[600px] rounded-lg border border-gray-300"></div>
+    </div>
+  </div>
+
+  <script src="https://api-maps.yandex.ru/2.1/?apikey=6645de69-1da7-468b-86da-59ced1a03485&lang=ru_RU"></script>
+  <script>
+    window.addEventListener("load", () => {
+      if (!window.ymaps) return;
+
+      window.ymaps.ready(() => {
+        const map = new window.ymaps.Map("map", {
+          center: [55.76, 37.64],
+          zoom: 10,
+        });
+
+        let placemark = null;
+
+        map.events.add("click", (event) => {
+          const coords = event.get("coords");
+          if (!placemark) {
+            placemark = new window.ymaps.Placemark(coords, {
+              iconCaption: "Место захоронения",
+            }, {
+              preset: "islands#violetDotIconWithCaption",
+              draggable: true,
+            });
+            map.geoObjects.add(placemark);
+          } else {
+            placemark.geometry.setCoordinates(coords);
+          }
+          console.log("Координаты:", coords);
+        });
+      });
+    });
+  </script>
+</MainLayout>

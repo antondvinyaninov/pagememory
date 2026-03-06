@@ -1,0 +1,109 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import AdminNewsletterPageIsland from "../../components/islands/AdminNewsletterPageIsland";
+import { requireAdminPage } from "../../lib/admin-access";
+const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
+const adminGuard = await requireAdminPage(Astro, API_BASE_URL);
+if (adminGuard instanceof Response) {
+  return adminGuard;
+}
+
+const audiences = [
+  { key: "all_users", label: "Все пользователи", count: 0 },
+  { key: "published_memorial_owners", label: "Владельцы опубликованных мемориалов", count: 0 },
+];
+---
+
+<AdminLayout title="Рассылки" active="newsletter">
+  <div class="p-4 sm:p-6 lg:p-8 space-y-6">
+    <div class="bg-white rounded-lg shadow">
+      <div class="px-4 sm:px-6 py-4 border-b border-gray-200">
+        <h3 class="text-base sm:text-lg font-semibold text-slate-800">Подключение почты</h3>
+      </div>
+      <div class="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div class="border border-gray-200 rounded-lg p-4">
+          <p class="text-xs text-gray-500">Mailer</p>
+          <p id="mail-status-mailer" class="text-sm font-semibold text-slate-800 mt-1">-</p>
+        </div>
+        <div class="border border-gray-200 rounded-lg p-4">
+          <p class="text-xs text-gray-500">SMTP Host / Port</p>
+          <p id="mail-status-host" class="text-sm font-semibold text-slate-800 mt-1">-</p>
+        </div>
+        <div class="border border-gray-200 rounded-lg p-4">
+          <p class="text-xs text-gray-500">From</p>
+          <p id="mail-status-from-name" class="text-sm font-semibold text-slate-800 mt-1">-</p>
+          <p id="mail-status-from-address" class="text-xs text-gray-500">-</p>
+        </div>
+        <div id="mail-status-state-box" class="border border-amber-200 bg-amber-50 rounded-lg p-4">
+          <p class="text-xs text-amber-700">Статус</p>
+          <p id="mail-status-state" class="text-sm font-semibold mt-1 text-amber-800">Проверьте настройки</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
+      <div class="bg-white rounded-lg shadow">
+        <div class="px-4 sm:px-6 py-4 border-b border-gray-200">
+          <h3 class="text-base sm:text-lg font-semibold text-slate-800">Системные шаблоны уведомлений</h3>
+        </div>
+        <div id="system-templates" class="p-4 sm:p-6 space-y-3">
+          <div class="border border-gray-200 rounded-lg p-3">
+            <p class="text-sm text-gray-500">Загрузка...</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow">
+        <div class="px-4 sm:px-6 py-4 border-b border-gray-200">
+          <h3 class="text-base sm:text-lg font-semibold text-slate-800">Тест отправки</h3>
+        </div>
+        <div class="p-4 sm:p-6">
+          <form id="newsletter-test" class="space-y-4">
+            <div>
+              <label for="test_email" class="block text-sm font-medium text-gray-700 mb-1">Email для теста</label>
+              <input id="test_email" name="test_email" type="email" class="w-full px-3 py-2 border border-gray-300 rounded-lg" required />
+            </div>
+            <div>
+              <label for="test_subject" class="block text-sm font-medium text-gray-700 mb-1">Тема</label>
+              <input id="test_subject" name="subject" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg" required />
+            </div>
+            <div>
+              <label for="test_content" class="block text-sm font-medium text-gray-700 mb-1">Текст письма</label>
+              <textarea id="test_content" name="content" rows="5" class="w-full px-3 py-2 border border-gray-300 rounded-lg" required></textarea>
+            </div>
+            <button type="submit" class="w-full sm:w-auto px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors font-medium">Отправить тестовое письмо</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow">
+        <div class="px-4 sm:px-6 py-4 border-b border-gray-200">
+          <h3 class="text-base sm:text-lg font-semibold text-slate-800">Массовая рассылка</h3>
+        </div>
+        <div class="p-4 sm:p-6">
+          <form id="newsletter-campaign" class="space-y-4">
+            <div>
+              <label for="audience" class="block text-sm font-medium text-gray-700 mb-1">Аудитория</label>
+              <select id="audience" name="audience" class="w-full px-3 py-2 border border-gray-300 rounded-lg" required>
+                {audiences.map((audience) => (
+                  <option value={audience.key}>{audience.label} ({audience.count})</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label for="campaign_subject" class="block text-sm font-medium text-gray-700 mb-1">Тема письма</label>
+              <input id="campaign_subject" name="subject" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg" required />
+            </div>
+            <div>
+              <label for="campaign_content" class="block text-sm font-medium text-gray-700 mb-1">Содержание</label>
+              <textarea id="campaign_content" name="content" rows="6" class="w-full px-3 py-2 border border-gray-300 rounded-lg" required></textarea>
+            </div>
+            <button type="submit" class="w-full sm:w-auto px-5 py-2.5 bg-slate-700 hover:bg-slate-800 text-white rounded-lg transition-colors font-medium">Запустить рассылку</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <AdminNewsletterPageIsland apiBaseUrl={API_BASE_URL} client:idle />
+</AdminLayout>

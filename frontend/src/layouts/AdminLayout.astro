@@ -1,0 +1,92 @@
+---
+import "../styles/global.css";
+import bundledProjectIcon from "../assets/memory-icon.png";
+
+interface Props {
+  title: string;
+  active?: string;
+}
+
+const { title, active = "" } = Astro.props as Props;
+const SITE_NAME = import.meta.env.PUBLIC_SITE_NAME ?? "Страницы памяти";
+const bundledProjectIconUrl = bundledProjectIcon.src;
+const PROJECT_ICON_URL_ENV = (import.meta.env.PUBLIC_PROJECT_ICON_URL ?? "").trim();
+const PROJECT_ICON_URL =
+  !PROJECT_ICON_URL_ENV || PROJECT_ICON_URL_ENV === "/brand/memory-icon.png"
+    ? bundledProjectIconUrl
+    : PROJECT_ICON_URL_ENV;
+
+const nav = [
+  { key: "index", href: "/admin", label: "Главная" },
+  { key: "users", href: "/admin/users", label: "Пользователи" },
+  { key: "memorials", href: "/admin/memorials", label: "Мемориалы" },
+  { key: "analytics", href: "/admin/analytics", label: "Метрики" },
+  { key: "seo", href: "/admin/seo", label: "SEO" },
+  { key: "newsletter", href: "/admin/newsletter", label: "Рассылки" },
+  { key: "settings", href: "/admin/settings", label: "Настройки" },
+];
+---
+
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title} - Админ-панель</title>
+    <meta name="robots" content="noindex,nofollow" />
+    <link rel="icon" type="image/png" sizes="32x32" href={PROJECT_ICON_URL} />
+    <link rel="icon" type="image/png" sizes="16x16" href={PROJECT_ICON_URL} />
+  </head>
+  <body class="bg-gray-50">
+    <div class="min-h-screen flex">
+      <aside class="w-64 bg-slate-800 text-white hidden lg:block">
+        <div class="p-6 border-b border-slate-700">
+          <h2 class="text-xl font-bold flex items-center gap-2">
+            <img src={PROJECT_ICON_URL} alt={SITE_NAME} class="w-7 h-7 rounded-md object-contain" />
+            <span>Админ-панель</span>
+          </h2>
+          <p class="text-sm text-slate-400 mt-1">Новый стек</p>
+        </div>
+
+        <nav class="mt-4">
+          {nav.map((item) => (
+            <a
+              href={item.href}
+              class:list={[
+                "flex items-center px-6 py-3 transition-colors",
+                active === item.key ? "bg-slate-700 border-l-4 border-red-500" : "hover:bg-slate-700",
+              ]}
+            >
+              {item.label}
+            </a>
+          ))}
+          <div class="border-t border-slate-700 my-4"></div>
+          <a href="/" class="flex items-center px-6 py-3 hover:bg-slate-700 transition-colors">На сайт</a>
+        </nav>
+      </aside>
+
+      <div class="lg:hidden fixed bottom-0 left-0 right-0 bg-slate-800 text-white z-50 border-t border-slate-700">
+        <nav class="flex justify-around py-2 overflow-x-auto">
+          {nav.map((item) => (
+            <a
+              href={item.href}
+              class:list={[
+                "flex flex-col items-center px-3 py-2 text-xs whitespace-nowrap",
+                active === item.key ? "text-red-400" : "text-gray-300",
+              ]}
+            >
+              {item.label}
+            </a>
+          ))}
+        </nav>
+      </div>
+
+      <main class="flex-1 overflow-y-auto pb-20 lg:pb-0">
+        <div class="bg-white border-b border-gray-200 px-4 sm:px-6 lg:px-8 py-4">
+          <h1 class="text-xl sm:text-2xl font-bold text-slate-800">{title}</h1>
+        </div>
+        <slot />
+      </main>
+    </div>
+  </body>
+</html>

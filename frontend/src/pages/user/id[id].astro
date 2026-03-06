@@ -1,0 +1,899 @@
+---
+import MainLayout from "../../layouts/MainLayout.astro";
+
+type UserMemorialSummary = {
+  id: number;
+  first_name: string;
+  last_name: string;
+  middle_name: string | null;
+  birth_date: string | null;
+  death_date: string | null;
+  birth_place: string | null;
+  biography: string | null;
+  photo: string | null;
+  religion: string | null;
+  status: string | null;
+  views: number | null;
+  memories_count: number;
+};
+
+type UserMemorySummary = {
+  id: number;
+  content: string;
+  created_at: string;
+  memorial_id: number | null;
+  memorial_first_name: string | null;
+  memorial_last_name: string | null;
+  memorial_photo: string | null;
+  photos?: string[] | null;
+  videos?: string[] | null;
+};
+
+type UserProfileDto = {
+  id: number;
+  name: string;
+  email: string;
+  avatar?: string | null;
+  country: string | null;
+  region: string | null;
+  city: string | null;
+  profile_type: string | null;
+  show_email: boolean;
+  show_memorials: boolean;
+   /** ISO-строка даты создания пользователя */
+  created_at?: string;
+  memorials: UserMemorialSummary[];
+  memories: UserMemorySummary[];
+};
+
+const { id } = Astro.params;
+
+const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
+const res = await fetch(`${API_BASE_URL}/users/${id}`);
+if (!res.ok) {
+  throw new Error(`Failed to load user profile (${res.status})`);
+}
+
+const user = (await res.json()) as UserProfileDto;
+
+const S3_BASE_URL = import.meta.env.PUBLIC_S3_BASE_URL ?? "https://s3.firstvds.ru/memory";
+
+function resolvePhotoUrl(path: string | null): string | null {
+  if (!path) return null;
+  if (path.startsWith("http://") || path.startsWith("https://")) {
+    return path;
+  }
+  return `${S3_BASE_URL.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
+}
+---
+
+<MainLayout title={`${user.name} — Профиль`}>
+  <div class="bg-gray-200 min-h-screen py-6">
+    <div class="container mx-auto px-4">
+      <div class="flex flex-col lg:flex-row gap-6">
+        {/* Основной контент */}
+        <main class="flex-1 space-y-6">
+          {/* Созданные мемориалы */}
+          <section class="bg-white rounded-xl shadow-md p-4 sm:p-6 lg:p-8">
+            <h2 class="text-xl font-semibold text-slate-700 mb-4">
+              Созданные мемориалы
+            </h2>
+
+            {user.memorials.length > 0 ? (
+              <div class="space-y-6">
+                {user.memorials.map((memorial) => {
+                  const photoUrl = resolvePhotoUrl(memorial.photo);
+                  return (
+                    <div class="flex flex-col xl:flex-row gap-4">
+                      {/* Hero блок мемориала */}
+                      <div class="flex-1 min-w-0 relative bg-slate-700 text-white rounded-xl overflow-hidden shadow-xl">
+                        <div class="absolute inset-0 bg-gradient-to-br from-slate-700/95 to-slate-800/85" />
+
+                        {/* Религиозный символ */}
+                        {memorial.religion === "orthodox" && (
+                          <div class="absolute top-6 right-6 z-10">
+                            <svg
+                              viewBox="0 0 24 24"
+                              class="w-12 h-12 fill-red-400 drop-shadow-lg"
+                            >
+                              <path
+                                d="M12 2v20M8 6h8M6 10h12M8 18h8"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                fill="none"
+                              />
+                              <path
+                                d="M12 2L10 4h4l-2-2zM12 22l-2-2h4l-2 2z"
+                                fill="currentColor"
+                              />
+                            </svg>
+                          </div>
+                        )}
+
+                        <a
+                          href={`/memorial/id${memorial.id}`}
+                          class="block relative p-4 sm:p-6 hover:bg-slate-600/20 transition-colors"
+                        >
+                          <div class="flex flex-col md:flex-row items-center md:items-start gap-6">
+                            {/* Фото */}
+                            <div
+                              class="w-full max-w-[260px] sm:max-w-[280px] md:w-64 md:h-64 aspect-square bg-gray-300 rounded-xl overflow-hidden flex-shrink-0 shadow-lg"
+                            >
+                              {photoUrl ? (
+                                <img
+                                  src={photoUrl}
+                                  alt={`${memorial.first_name} ${memorial.last_name}`}
+                                  class="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div
+                                  class="w-full h-full bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center"
+                                >
+                                  <svg
+                                    class="w-24 h-24 text-gray-500"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      stroke-linecap="round"
+                                      stroke-linejoin="round"
+                                      stroke-width="2"
+                                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                                    />
+                                  </svg>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Информация */}
+                            <div class="flex-1 min-w-0 text-center md:text-left">
+                              <h3
+                                class="text-2xl md:text-3xl font-bold mb-3 leading-tight break-words"
+                              >
+                                <div class="block">{memorial.last_name}</div>
+                                <div class="block">{memorial.first_name}</div>
+                                {memorial.middle_name && (
+                                  <div class="block">{memorial.middle_name}</div>
+                                )}
+                              </h3>
+
+                              {/* Даты жизни */}
+                              {(memorial.birth_date || memorial.death_date) && (
+                                <div class="mb-4">
+                                  <div
+                                    class="text-lg md:text-xl font-bold text-red-400"
+                                  >
+                                    {memorial.birth_date
+                                      ? (() => {
+                                          const date = new Date(memorial.birth_date);
+                                          const day = String(date.getDate()).padStart(2, "0");
+                                          const month = String(date.getMonth() + 1).padStart(2, "0");
+                                          const year = date.getFullYear();
+                                          return `${day}.${month}.${year}`;
+                                        })()
+                                      : "—"}
+                                    <span class="mx-3">—</span>
+                                    {memorial.death_date
+                                      ? (() => {
+                                          const date = new Date(memorial.death_date);
+                                          const day = String(date.getDate()).padStart(2, "0");
+                                          const month = String(date.getMonth() + 1).padStart(2, "0");
+                                          const year = date.getFullYear();
+                                          return `${day}.${month}.${year}`;
+                                        })()
+                                      : "—"}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Место рождения */}
+                              {memorial.birth_place && (
+                                <div class="mb-4 flex items-center justify-center md:justify-start gap-2">
+                                  <svg
+                                    class="w-4 h-4 md:w-5 md:h-5 text-white"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      stroke-linecap="round"
+                                      stroke-linejoin="round"
+                                      stroke-width="2"
+                                      d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                                    />
+                                    <path
+                                      stroke-linecap="round"
+                                      stroke-linejoin="round"
+                                      stroke-width="2"
+                                      d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                                    />
+                                  </svg>
+                                  <span
+                                    class="text-sm md:text-base opacity-90 break-words"
+                                  >
+                                    {memorial.birth_place}
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* Краткая биография */}
+                              {memorial.biography && (
+                                <div class="mb-3">
+                                  <div
+                                    class="text-base md:text-lg font-semibold text-white italic break-words"
+                                  >
+                                    {memorial.biography}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Статус мемориала (внизу) */}
+                              <div class="mt-4 flex justify-center md:justify-start">
+                                {memorial.status === "draft" ? (
+                                  <span
+                                    class="px-3 py-1.5 bg-yellow-400 text-yellow-900 text-sm font-semibold rounded-lg shadow-lg"
+                                  >
+                                    Черновик
+                                  </span>
+                                ) : (
+                                  <span
+                                    class="px-3 py-1.5 bg-green-500 text-white text-sm font-semibold rounded-lg shadow-lg"
+                                  >
+                                    Опубликован
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </a>
+                      </div>
+
+                      {/* Блок управления (как в Laravel, пока без проверки владельца) */}
+                      <div class="w-full xl:w-72 flex-shrink-0">
+                        <div class="bg-white rounded-xl shadow-md overflow-hidden xl:sticky xl:top-4">
+                          {/* Заголовок */}
+                          <div class="bg-gradient-to-r from-slate-700 to-slate-800 px-5 py-4">
+                            <h4 class="text-base font-bold text-white flex items-center gap-2">
+                              <svg
+                                class="w-5 h-5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                  stroke-width="2"
+                                  d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"
+                                />
+                              </svg>
+                              Управление
+                            </h4>
+                          </div>
+
+                          {/* Кнопки */}
+                          <div class="p-4 space-y-3">
+                            <a
+                              href={`/memorial/id${memorial.id}`}
+                              class="flex items-center gap-3 w-full bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white px-4 py-3 rounded-lg transition-all shadow-md hover:shadow-lg text-sm font-semibold group"
+                            >
+                              <svg
+                                class="w-5 h-5 group-hover:scale-110 transition-transform"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                  stroke-width="2"
+                                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                />
+                                <path
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                  stroke-width="2"
+                                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                />
+                              </svg>
+                              <span>Просмотр</span>
+                            </a>
+
+                            <a
+                              href={`/memorial/id${memorial.id}/edit`}
+                              class="flex items-center gap-3 w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-4 py-3 rounded-lg transition-all shadow-md hover:shadow-lg text-sm font-semibold group"
+                            >
+                              <svg
+                                class="w-5 h-5 group-hover:scale-110 transition-transform"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                  stroke-width="2"
+                                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                />
+                              </svg>
+                              <span>Редактировать</span>
+                            </a>
+
+                            {/* Статистика */}
+                            <div class="pt-3 mt-3 border-t border-gray-200">
+                              <div class="space-y-2 text-sm">
+                                <div class="flex items-center justify-between text-gray-600">
+                                  <span class="flex items-center gap-2">
+                                    <svg
+                                      class="w-4 h-4"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                      />
+                                      <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                      />
+                                    </svg>
+                                    Просмотры
+                                  </span>
+                                  <span class="font-semibold text-gray-800">
+                                    {memorial.views ?? 0}
+                                  </span>
+                                </div>
+                                <div class="flex items-center justify-between text-gray-600">
+                                  <span class="flex items-center gap-2">
+                                    <svg
+                                      class="w-4 h-4"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                                      />
+                                    </svg>
+                                    Воспоминания
+                                  </span>
+                                  <span class="font-semibold text-gray-800">
+                                    {memorial.memories_count ?? 0}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Добавить новый мемориал (как в оригинале, пока без проверки владельца) */}
+                <a
+                  href="/memorial/create"
+                  class="block border-2 border-dashed border-red-300 hover:border-red-500 rounded-xl p-5 sm:p-8 transition-colors group bg-red-50/50 hover:bg-red-50"
+                >
+                  <div class="flex flex-col items-center justify-center text-center">
+                    <div class="w-12 h-12 bg-red-100 group-hover:bg-red-200 rounded-full flex items-center justify-center mb-3 transition-colors">
+                      <svg
+                        class="w-6 h-6 text-red-500 group-hover:text-red-600 transition-colors"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M12 4v16m8-8H4"
+                        />
+                      </svg>
+                    </div>
+                    <h3 class="text-base font-semibold text-gray-700 group-hover:text-red-600 mb-1 transition-colors">
+                      Создать новый мемориал
+                    </h3>
+                    <p class="text-sm text-gray-500">
+                      Нажмите, чтобы добавить страницу памяти
+                    </p>
+                  </div>
+                </a>
+              </div>
+            ) : (
+              <div class="text-center py-12 text-gray-500">
+                <svg
+                  class="w-16 h-16 text-gray-300 mx-auto mb-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                  />
+                </svg>
+                <p class="text-gray-500 mb-4">Пока нет созданных мемориалов</p>
+              </div>
+            )}
+          </section>
+
+          {/* Оставленные воспоминания */}
+          <section class="bg-white rounded-xl shadow-md p-4 sm:p-6 lg:p-8">
+            <h2 class="text-xl font-semibold text-slate-700 mb-6">
+              Оставленные воспоминания
+            </h2>
+            {user.memories.length > 0 ? (
+              <div class="space-y-4">
+                {user.memories.map((memory) => {
+                  const photoUrl = resolvePhotoUrl(memory.memorial_photo);
+                  return (
+                    <div
+                      class="bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 rounded-xl p-5 hover:shadow-lg transition-all relative"
+                      data-memory-id={String(memory.id)}
+                    >
+                      {/* Кнопка меню (три точки) */}
+                      <div class="absolute top-3 right-3">
+                        <button
+                          type="button"
+                          data-memory-menu-btn
+                          data-memory-id={String(memory.id)}
+                          class="p-1.5 rounded-lg hover:bg-gray-200 transition-colors text-gray-500 hover:text-gray-700"
+                          aria-label="Меню воспоминания"
+                        >
+                          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
+                          </svg>
+                        </button>
+                        {/* Выпадающее меню */}
+                        <div
+                          data-memory-menu
+                          data-memory-id={String(memory.id)}
+                          class="hidden absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10 overflow-hidden"
+                        >
+                          <a
+                            href={memory.memorial_id ? `/memorial/id${memory.memorial_id}` : "#"}
+                            class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
+                          >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                            </svg>
+                            Редактировать
+                          </a>
+                          <button
+                            type="button"
+                            data-memory-delete-btn
+                            data-memory-id={String(memory.id)}
+                            class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2"
+                          >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                            Удалить
+                          </button>
+                        </div>
+                      </div>
+
+                      <div class="flex items-start gap-4">
+                        {/* Фото мемориала */}
+                        {photoUrl && (
+                          <a
+                            href={
+                              memory.memorial_id
+                                ? `/memorial/id${memory.memorial_id}`
+                                : "#"
+                            }
+                            class="flex-shrink-0"
+                          >
+                            <div
+                              class="w-20 h-20 rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow"
+                            >
+                              <img
+                                src={photoUrl}
+                                alt=""
+                                class="w-full h-full object-cover"
+                              />
+                            </div>
+                          </a>
+                        )}
+
+                        <div class="flex-1 min-w-0">
+                          {/* Ссылка на мемориал */}
+                          {memory.memorial_id && (
+                            <a
+                              href={`/memorial/id${memory.memorial_id}`}
+                              class="inline-flex items-center gap-2 text-base font-semibold text-slate-700 hover:text-red-600 mb-2 transition-colors"
+                            >
+                              <svg
+                                class="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                  stroke-width="2"
+                                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                                />
+                              </svg>
+                              {memory.memorial_first_name}{" "}
+                              {memory.memorial_last_name}
+                            </a>
+                          )}
+
+                          {/* Текст воспоминания */}
+                          {memory.content && (
+                            <div class="bg-white rounded-lg p-4 mb-3 shadow-sm">
+                              <p class="text-gray-700 leading-relaxed">
+                                {memory.content}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Фото воспоминания */}
+                          {(() => {
+                            const photos = memory.photos ?? [];
+                            if (!Array.isArray(photos) || photos.length === 0) return null;
+
+                            const resolved = photos
+                              .map((path) => (typeof path === "string" ? path.trim() : ""))
+                              .filter((path) => path.length > 0);
+
+                            if (resolved.length === 0) return null;
+
+                            if (resolved.length === 1) {
+                              return (
+                                <div class="mb-3">
+                                  <div class="relative group cursor-pointer max-w-md">
+                                    <div class="aspect-[4/3] rounded-lg overflow-hidden bg-gray-100">
+                                      <img
+                                        src={resolved[0]}
+                                        alt="Фото воспоминания"
+                                        class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            if (resolved.length === 2) {
+                              return (
+                                <div class="mb-3">
+                                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2">
+                                    {resolved.map((url) => (
+                                      <div class="relative group cursor-pointer">
+                                        <div class="aspect-[4/3] rounded-lg overflow-hidden bg-gray-100">
+                                          <img
+                                            src={url}
+                                            alt="Фото воспоминания"
+                                            class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                          />
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <div class="mb-3">
+                                <div class="grid grid-cols-2 gap-1.5 sm:gap-2">
+                                  {resolved.map((url) => (
+                                    <div class="relative group cursor-pointer">
+                                      <div class="aspect-[4/3] rounded-lg overflow-hidden bg-gray-100">
+                                        <img
+                                          src={url}
+                                          alt="Фото воспоминания"
+                                          class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                        />
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })()}
+
+                          {/* Видео воспоминания */}
+                          {(() => {
+                            const videos = memory.videos ?? [];
+                            if (!Array.isArray(videos) || videos.length === 0) return null;
+
+                            const resolved = videos
+                              .map((path) => (typeof path === "string" ? path.trim() : ""))
+                              .filter((path) => path.length > 0);
+
+                            if (resolved.length === 0) return null;
+
+                            return (
+                              <div class="mb-3">
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  {resolved.map((url) => (
+                                    <div class="relative aspect-[4/3] rounded-lg overflow-hidden bg-gray-900">
+                                      <video
+                                        src={url}
+                                        controls
+                                        preload="metadata"
+                                        class="w-full h-full object-cover"
+                                      ></video>
+                                      <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                        <div class="w-12 h-12 sm:w-16 sm:h-16 bg-white/90 rounded-full flex items-center justify-center">
+                                          <svg class="w-6 h-6 sm:w-8 sm:w-8 text-gray-800 ml-1" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M8 5v14l11-7z"/>
+                                          </svg>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })()}
+
+                          {/* Дата и статистика (упрощённо, только дата, как сейчас в API) */}
+                          <div class="flex items-center gap-4 text-xs text-gray-500">
+                            <div class="flex items-center gap-1">
+                              <svg
+                                class="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                  stroke-width="2"
+                                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                />
+                              </svg>
+                              <span>{memory.created_at}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div class="text-center py-12 text-gray-500">
+                <svg
+                  class="w-16 h-16 text-gray-300 mx-auto mb-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                  />
+                </svg>
+                <p>Пока нет оставленных воспоминаний</p>
+              </div>
+            )}
+          </section>
+        </main>
+
+        {/* Боковая панель справа */}
+        <aside class="lg:w-96 lg:sticky lg:top-4 lg:h-fit space-y-6">
+          <div class="bg-white rounded-xl shadow-md overflow-hidden">
+            {/* Аватар и основная информация */}
+            <div class="p-6">
+              <div class="text-center">
+                {user.avatar ? (
+                  <div class="w-full aspect-square rounded-2xl mx-auto overflow-hidden mb-4">
+                    <img
+                      src={resolvePhotoUrl(user.avatar)}
+                      alt={user.name}
+                      class="w-full h-full object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div class="w-full aspect-square bg-red-100 rounded-2xl mx-auto flex items-center justify-center text-6xl font-bold text-red-600 mb-4">
+                    {(user.name || "")
+                      .toUpperCase()
+                      .slice(0, 2)}
+                  </div>
+                )}
+                <h1 class="text-2xl font-bold text-slate-700 mb-2">
+                  {user.name}
+                </h1>
+                <p class="text-gray-500 text-sm mb-4">{user.email}</p>
+
+                {/* Кнопки действий (пока показываем только «Редактировать профиль» как в оригинале для владельца) */}
+                <a
+                  href="/user/edit"
+                  class="block w-full px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors text-center font-medium"
+                >
+                  Редактировать профиль
+                </a>
+              </div>
+            </div>
+          </div>
+
+          {/* О себе */}
+          <div class="bg-white rounded-xl shadow-md p-6">
+            <h2 class="text-lg font-semibold text-slate-700 mb-4">О себе</h2>
+            <div class="space-y-3">
+              {(user.city || user.region) && (
+                <div class="flex items-center gap-3 text-gray-600">
+                  <svg
+                    class="w-5 h-5 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                    />
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                    />
+                  </svg>
+                  <span>
+                    {[user.city, user.region].filter(Boolean).join(", ")}
+                  </span>
+                </div>
+              )}
+              {user.created_at && (
+                <div class="flex items-center gap-3 text-gray-600">
+                  <svg
+                    class="w-5 h-5 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    />
+                  </svg>
+                  <span>
+                    На сайте с{" "}
+                    {(() => {
+                      try {
+                        const date = new Date(user.created_at);
+                        if (isNaN(date.getTime())) return "";
+                        return date.toLocaleDateString("ru-RU", {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                        });
+                      } catch {
+                        return "";
+                      }
+                    })()}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Инициализация контекстного меню для воспоминаний
+    document.addEventListener("DOMContentLoaded", () => {
+      const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
+
+      // Закрытие всех меню при клике вне их
+      document.addEventListener("click", (event) => {
+        const target = event.target as HTMLElement;
+        if (!target.closest("[data-memory-menu-btn]") && !target.closest("[data-memory-menu]")) {
+          document.querySelectorAll("[data-memory-menu]").forEach((menu) => {
+            menu.classList.add("hidden");
+          });
+        }
+      });
+
+      // Обработка клика на кнопку меню
+      document.querySelectorAll("[data-memory-menu-btn]").forEach((btn) => {
+        btn.addEventListener("click", (event) => {
+          event.stopPropagation();
+          const memoryId = btn.getAttribute("data-memory-id");
+          if (!memoryId) return;
+
+          // Закрываем все другие меню
+          document.querySelectorAll("[data-memory-menu]").forEach((menu) => {
+            if (menu.getAttribute("data-memory-id") !== memoryId) {
+              menu.classList.add("hidden");
+            }
+          });
+
+          // Переключаем текущее меню
+          const menu = document.querySelector(
+            `[data-memory-menu][data-memory-id="${memoryId}"]`
+          ) as HTMLElement | null;
+          if (menu) {
+            menu.classList.toggle("hidden");
+          }
+        });
+      });
+
+      // Обработка удаления воспоминания
+      document.querySelectorAll("[data-memory-delete-btn]").forEach((btn) => {
+        btn.addEventListener("click", async (event) => {
+          event.stopPropagation();
+          const memoryId = btn.getAttribute("data-memory-id");
+          if (!memoryId) return;
+
+          if (!confirm("Вы уверены, что хотите удалить это воспоминание? Это действие нельзя отменить.")) {
+            return;
+          }
+
+          const memoryCard = document.querySelector(
+            `[data-memory-id="${memoryId}"]`
+          ) as HTMLElement | null;
+          if (!memoryCard) return;
+
+          // Показываем состояние загрузки
+          memoryCard.style.opacity = "0.5";
+          memoryCard.style.pointerEvents = "none";
+
+          try {
+            const res = await fetch(`${API_BASE_URL}/memorials/memories/${memoryId}`, {
+              method: "DELETE",
+              credentials: "include",
+            });
+
+            if (!res.ok) {
+              const payload = await res.json().catch(() => null);
+              const errorMessage = payload?.message || payload?.error || `Ошибка ${res.status}: ${res.statusText}`;
+              console.error("Failed to delete memory:", { status: res.status, payload });
+              alert(errorMessage);
+              memoryCard.style.opacity = "1";
+              memoryCard.style.pointerEvents = "auto";
+              return;
+            }
+
+            // Удаляем карточку воспоминания
+            memoryCard.style.transition = "opacity 0.3s ease-out";
+            memoryCard.style.opacity = "0";
+            setTimeout(() => {
+              memoryCard.remove();
+              
+              // Проверяем, остались ли воспоминания
+              const memoriesContainer = document.querySelector(".space-y-4");
+              if (memoriesContainer && memoriesContainer.children.length === 0) {
+                // Перезагружаем страницу, чтобы показать пустое состояние
+                window.location.reload();
+              }
+            }, 300);
+          } catch (error) {
+            console.error("Error deleting memory:", error);
+            alert("Ошибка связи с сервером");
+            memoryCard.style.opacity = "1";
+            memoryCard.style.pointerEvents = "auto";
+          }
+        });
+      });
+    });
+  </script>
+</MainLayout>

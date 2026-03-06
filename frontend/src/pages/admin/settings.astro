@@ -1,0 +1,112 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import AdminSettingsPageIsland from "../../components/islands/AdminSettingsPageIsland";
+import { requireAdminPage } from "../../lib/admin-access";
+import bundledProjectIcon from "../../assets/memory-icon.png";
+
+const siteName = import.meta.env.PUBLIC_SITE_NAME ?? "Страницы памяти";
+const bundledProjectIconUrl = bundledProjectIcon.src;
+const projectIconEnv = (import.meta.env.PUBLIC_PROJECT_ICON_URL ?? "").trim();
+const projectIcon =
+  !projectIconEnv || projectIconEnv === "/brand/memory-icon.png"
+    ? bundledProjectIconUrl
+    : projectIconEnv;
+const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
+const adminGuard = await requireAdminPage(Astro, API_BASE_URL);
+if (adminGuard instanceof Response) {
+  return adminGuard;
+}
+const { cookieHeader } = adminGuard;
+
+let settings = {
+  general: {
+    site_name: siteName,
+    site_tagline: "",
+  },
+  access: {
+    allow_registration: true,
+    enable_memorial_creation: true,
+    enable_memories: true,
+    enable_comments: true,
+  },
+};
+
+let errorMessage = "";
+
+try {
+  const res = await fetch(`${API_BASE_URL}/admin/settings`, {
+    credentials: "include",
+    headers: { cookie: cookieHeader },
+  });
+  if (res.ok) {
+    const data = await res.json();
+    settings = {
+      ...settings,
+      ...data,
+      general: { ...settings.general, ...(data?.general ?? {}) },
+      access: { ...settings.access, ...(data?.access ?? {}) },
+    };
+  } else if (res.status === 401) {
+    errorMessage = "Требуется вход администратора.";
+  }
+} catch {
+  errorMessage = "Не удалось загрузить настройки.";
+}
+---
+
+<AdminLayout title="Настройки" active="settings">
+  <div class="p-4 sm:p-6 lg:p-8 space-y-6">
+    {errorMessage && (
+      <div class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{errorMessage}</div>
+    )}
+
+    <form id="settings-form" class="space-y-6">
+      <div class="bg-white rounded-lg shadow">
+        <div class="px-4 sm:px-6 py-4 border-b border-gray-200">
+          <h3 class="text-base sm:text-lg font-semibold text-slate-800">Общие настройки</h3>
+        </div>
+        <div class="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label for="site_name" class="block text-sm font-medium text-gray-700 mb-1">Название проекта</label>
+            <input id="site_name" name="site_name" type="text" value={settings.general.site_name} class="w-full px-3 py-2 border border-gray-300 rounded-lg" required />
+          </div>
+          <div>
+            <label for="site_tagline" class="block text-sm font-medium text-gray-700 mb-1">Подзаголовок</label>
+            <input id="site_tagline" name="site_tagline" type="text" value={settings.general.site_tagline} class="w-full px-3 py-2 border border-gray-300 rounded-lg" />
+          </div>
+          <div class="md:col-span-2">
+            <label for="project_icon" class="block text-sm font-medium text-gray-700 mb-2">Иконка проекта</label>
+            <div class="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 mb-3">
+              <img src={projectIcon} alt="Иконка" class="h-10 w-10 object-contain rounded" />
+              <p class="text-sm text-gray-600">Текущая иконка используется в хедере и favicon.</p>
+            </div>
+            <input id="project_icon" name="project_icon" type="file" accept="image/png" class="w-full text-sm text-gray-700" />
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow">
+        <div class="px-4 sm:px-6 py-4 border-b border-gray-200">
+          <h3 class="text-base sm:text-lg font-semibold text-slate-800">Доступ и функционал</h3>
+        </div>
+        <div class="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <label class="flex items-start gap-3 p-3 border border-gray-200 rounded-lg"><input type="checkbox" name="allow_registration" checked={settings.access.allow_registration === true} class="mt-1" /><span class="text-sm text-slate-800">Разрешить регистрацию</span></label>
+          <label class="flex items-start gap-3 p-3 border border-gray-200 rounded-lg"><input type="checkbox" name="enable_memorial_creation" checked={settings.access.enable_memorial_creation === true} class="mt-1" /><span class="text-sm text-slate-800">Разрешить создание мемориалов</span></label>
+          <label class="flex items-start gap-3 p-3 border border-gray-200 rounded-lg"><input type="checkbox" name="enable_memories" checked={settings.access.enable_memories === true} class="mt-1" /><span class="text-sm text-slate-800">Разрешить воспоминания</span></label>
+          <label class="flex items-start gap-3 p-3 border border-gray-200 rounded-lg"><input type="checkbox" name="enable_comments" checked={settings.access.enable_comments === true} class="mt-1" /><span class="text-sm text-slate-800">Разрешить комментарии</span></label>
+        </div>
+      </div>
+
+      <div class="flex justify-end">
+        <button type="submit" class="px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors font-medium">Сохранить настройки</button>
+      </div>
+    </form>
+
+    <div class="bg-white rounded-lg shadow p-4 sm:p-6">
+      <h4 class="text-sm font-semibold text-slate-800 mb-2">Примечание</h4>
+      <p class="text-sm text-gray-600">Экран перенесен из Laravel. Привязка к API настроек NestJS будет выполнена отдельным этапом.</p>
+    </div>
+  </div>
+
+  <AdminSettingsPageIsland apiBaseUrl={API_BASE_URL} client:idle />
+</AdminLayout>

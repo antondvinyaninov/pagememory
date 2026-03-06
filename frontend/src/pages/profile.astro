@@ -1,0 +1,26 @@
+---
+const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
+
+const cookie = Astro.request.headers.get("cookie") ?? "";
+let target = "/login";
+
+if (cookie) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/auth/me`, {
+      method: "GET",
+      headers: { cookie },
+    });
+    if (res.ok) {
+      const me = await res.json().catch(() => null);
+      const userId = Number(me?.id || 0);
+      if (userId > 0) {
+        target = `/user/id${userId}`;
+      }
+    }
+  } catch {
+    // ignore, keep fallback target
+  }
+}
+
+return Astro.redirect(target, 302);
+---

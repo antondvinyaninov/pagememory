@@ -1,0 +1,276 @@
+---
+const { id: rawId } = Astro.params;
+// Убираем префикс "id" если он есть (например, "id1" -> "1", "1" -> "1")
+const id = rawId ? String(rawId).replace(/^id/, "") : null;
+
+const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
+const S3_BASE_URL = import.meta.env.PUBLIC_S3_BASE_URL ?? "https://s3.firstvds.ru/memory";
+const SITE_NAME = import.meta.env.PUBLIC_SITE_NAME ?? "Страницы памяти";
+
+type MemorialApi = {
+  id: number | string;
+  first_name: string;
+  last_name: string;
+  middle_name: string | null;
+  birth_date: string | null;
+  death_date: string | null;
+  birth_place: string | null;
+  burial_city: string | null;
+  burial_place: string | null;
+  photo: string | null;
+  religion: string | null;
+};
+
+let memorial: MemorialApi | null = null;
+
+if (id) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/memorials/${id}`);
+    if (res.ok) {
+      const data = await res.json();
+      memorial = data as MemorialApi;
+    } else {
+      console.error(`[og-image] Failed to fetch memorial ${id}: ${res.status}`);
+    }
+  } catch (error) {
+    console.error(`[og-image] Error fetching memorial:`, error);
+  }
+}
+
+function resolvePhotoUrl(memorial: MemorialApi): string {
+  if (memorial.photo) {
+    if (memorial.photo.startsWith("http://") || memorial.photo.startsWith("https://")) {
+      return memorial.photo;
+    }
+    if (S3_BASE_URL) {
+      return `${S3_BASE_URL.replace(/\/$/, "")}/${memorial.photo.replace(/^\//, "")}`;
+    }
+  }
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(
+    `${memorial.first_name} ${memorial.last_name}`,
+  )}&size=300&background=e5e7eb&color=6b7280&bold=true`;
+}
+
+// Форматирование дат
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return "";
+  try {
+    const date = new Date(dateStr);
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    return `${day}.${month}.${year}`;
+  } catch {
+    return dateStr;
+  }
+}
+
+// Формируем полное имя в одну строку как в hero блоке
+const fullName = memorial
+  ? `${memorial.last_name} ${memorial.first_name} ${memorial.middle_name ?? ""}`.trim()
+  : "";
+
+const birthDate = memorial?.birth_date ? formatDate(memorial.birth_date) : "—";
+const deathDate = memorial?.death_date ? formatDate(memorial.death_date) : "—";
+
+// Используем место рождения или место захоронения
+const location = memorial?.birth_place || memorial?.burial_city || memorial?.burial_place || "";
+const photoUrl = memorial ? resolvePhotoUrl(memorial) : "";
+const hasOrthodoxCross = memorial?.religion === "orthodox";
+---
+
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OG Image</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        width: 1200px;
+        height: 630px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        overflow: hidden;
+        background: #1e293b;
+      }
+      .card {
+        width: 100%;
+        height: 100%;
+        position: relative;
+        background: #1e293b;
+        display: flex;
+        align-items: center;
+        padding: 60px 80px;
+        border-radius: 16px;
+        overflow: hidden;
+        border: 1px solid #334155;
+      }
+      /* Градиенты как в hero блоке */
+      .gradient-overlay {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at top right, rgba(56, 189, 248, 0.16), transparent 46%),
+          radial-gradient(circle at bottom left, rgba(100, 116, 139, 0.22), transparent 50%),
+          linear-gradient(135deg, #1e293b 0%, #111827 55%, #0b1120 100%);
+      }
+      /* Декоративные размытые круги */
+      .decorative-circle-1 {
+        position: absolute;
+        top: -112px;
+        left: -80px;
+        width: 288px;
+        height: 288px;
+        border-radius: 50%;
+        background: rgba(100, 116, 139, 0.25);
+        filter: blur(96px);
+      }
+      .decorative-circle-2 {
+        position: absolute;
+        bottom: -128px;
+        right: -64px;
+        width: 320px;
+        height: 320px;
+        border-radius: 50%;
+        background: rgba(56, 189, 248, 0.2);
+        filter: blur(96px);
+      }
+      .photo-section {
+        flex-shrink: 0;
+        width: 320px;
+        height: 320px;
+        margin-right: 60px;
+        position: relative;
+        z-index: 10;
+      }
+      .photo-container {
+        width: 100%;
+        height: 100%;
+        border-radius: 16px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(100, 116, 139, 0.2);
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+      }
+      .photo-container img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .text-section {
+        flex: 1;
+        color: white;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        min-width: 0;
+        position: relative;
+        z-index: 10;
+      }
+      .name {
+        font-size: 56px;
+        font-weight: 800;
+        line-height: 1.2;
+        margin-bottom: 24px;
+        color: white;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      }
+      .dates-container {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.45);
+        background: rgba(15, 23, 42, 0.45);
+        padding: 12px 16px;
+        margin-bottom: 20px;
+      }
+      .dates {
+        font-size: 20px;
+        font-weight: 600;
+        color: white;
+      }
+      .location {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 20px;
+        color: rgba(241, 245, 249, 1);
+      }
+      .location-icon {
+        width: 20px;
+        height: 20px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 2;
+      }
+      .orthodox-cross {
+        position: absolute;
+        top: 40px;
+        right: 40px;
+        z-index: 20;
+      }
+      .orthodox-cross svg {
+        width: 48px;
+        height: 48px;
+        color: white;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="gradient-overlay"></div>
+      <div class="decorative-circle-1"></div>
+      <div class="decorative-circle-2"></div>
+      
+      {hasOrthodoxCross && (
+        <div class="orthodox-cross">
+          <svg viewBox="0 0 24 24" class="text-white drop-shadow">
+            <path d="M12 2v20M8 6h8M6 10h12M8 18h8" stroke="currentColor" stroke-width="2" fill="none"/>
+            <path d="M12 2L10 4h4l-2-2zM12 22l-2-2h4l-2 2z" fill="currentColor"/>
+          </svg>
+        </div>
+      )}
+      
+      {memorial ? (
+        <>
+          {photoUrl && (
+            <div class="photo-section">
+              <div class="photo-container">
+                <img src={photoUrl} alt={fullName} />
+              </div>
+            </div>
+          )}
+          
+          <div class="text-section">
+            {fullName && <h1 class="name">{fullName}</h1>}
+            
+            <div class="dates-container">
+              <span class="dates">{birthDate}</span>
+              <span class="dates">—</span>
+              <span class="dates">{deathDate}</span>
+            </div>
+            
+            {location && (
+              <div class="location">
+                <svg class="location-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <span>{location}</span>
+              </div>
+            )}
+          </div>
+        </>
+      ) : (
+        <div style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; color: white; font-size: 24px; position: relative; z-index: 10;">
+          Мемориал не найден
+        </div>
+      )}
+    </div>
+  </body>
+</html>

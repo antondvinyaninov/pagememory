@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+    "strict": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "target": "esnext",
+    "allowJs": true,
+    "resolveJsonModule": true,
+    "types": ["astro/client"],
+    "baseUrl": "./src"
+  },
+  "include": ["src"]
+}
+
+
