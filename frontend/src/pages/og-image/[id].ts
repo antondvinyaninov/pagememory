@@ -70,6 +70,22 @@ export const GET: APIRoute = async ({ params }) => {
   const location = memorial.birth_place || memorial.burial_city || memorial.burial_place || "";
   const photoUrl = resolvePhotoUrl(memorial);
 
+  // Загружаем фото заранее и конвертируем в base64 для @vercel/og
+  let photoBase64 = "";
+  try {
+    const photoRes = await fetch(photoUrl);
+    if (photoRes.ok) {
+      const buffer = await photoRes.arrayBuffer();
+      const base64 = Buffer.from(buffer).toString("base64");
+      const contentType = photoRes.headers.get("content-type") || "image/jpeg";
+      photoBase64 = `data:${contentType};base64,${base64}`;
+    }
+  } catch (error) {
+    console.error("[og-image] Error loading photo:", error);
+    // Используем fallback аватар
+    photoBase64 = photoUrl;
+  }
+
   try {
     const html = {
       type: "div",
@@ -101,7 +117,7 @@ export const GET: APIRoute = async ({ params }) => {
               children: {
                 type: "img",
                 props: {
-                  src: photoUrl,
+                  src: photoBase64,
                   alt: fullName,
                   width: "320",
                   height: "320",
