@@ -38,8 +38,19 @@ if (cookieHeader) {
   }
 }
 
+type Memorial = {
+  id: number;
+  first_name: string;
+  last_name: string;
+  middle_name?: string | null;
+  birth_date?: string | null;
+  death_date?: string | null;
+  photo?: string | null;
+  memories_count?: number;
+};
+
 let stats = { photos: 0, memorials: 0, users: 0, memories: 0 };
-let recentMemorials = [];
+let recentMemorials: Memorial[] = [];
 
 try {
   const res = await fetch(`${API_BASE_URL}/memorials/home`);
@@ -57,7 +68,7 @@ try {
   // ignore
 }
 
-function resolvePhoto(path) {
+function resolvePhoto(path: string | null | undefined): string | null {
   if (!path) return null;
   if (path.startsWith("http://") || path.startsWith("https://")) return path;
   return `${S3_BASE_URL.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
