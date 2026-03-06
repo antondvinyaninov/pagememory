@@ -20,8 +20,8 @@ COPY frontend ./frontend
 RUN cd backend && npm run build
 
 # Собираем frontend с переменными окружения для production
-# ВАЖНО: PUBLIC_API_BASE_URL должен быть полным URL для SSR
-ENV PUBLIC_API_BASE_URL=http://127.0.0.1:4000/api
+# Используем относительный URL - nginx будет проксировать
+ENV PUBLIC_API_BASE_URL=/api
 ENV PUBLIC_APP_URL=https://pagesofmemory.ru
 ENV PUBLIC_S3_BASE_URL=https://s3.firstvds.ru/memory
 ENV PUBLIC_SITE_NAME="Страницы памяти"
