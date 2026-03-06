@@ -20,8 +20,8 @@ COPY frontend ./frontend
 RUN cd backend && npm run build
 
 # Собираем frontend с переменными окружения
-# Используем ARG для передачи переменных на этапе сборки
-ARG PUBLIC_API_BASE_URL=/api
+# PUBLIC_API_BASE_URL должен быть полным URL для SSR запросов
+ARG PUBLIC_API_BASE_URL=http://127.0.0.1:4000/api
 ARG PUBLIC_APP_URL=https://pagesofmemory.ru
 ARG PUBLIC_S3_BASE_URL=https://s3.firstvds.ru/memory
 ARG PUBLIC_SITE_NAME="Страницы памяти"
