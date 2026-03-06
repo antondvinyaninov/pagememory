@@ -16,8 +16,8 @@ export class UtilsService {
     try {
       const requestBody = {
         query: query,
-        from_bound: { value: "city" },
-        to_bound: { value: "city" },
+        from_bound: { value: "settlement" }, // Включает города, деревни, села
+        to_bound: { value: "settlement" },
         locations: [{ country: "*" }],
       };
 
