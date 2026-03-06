@@ -36,39 +36,34 @@ COPY --from=builder /app/frontend/dist ./frontend/dist
 COPY --from=builder /app/frontend/node_modules ./frontend/node_modules
 COPY --from=builder /app/frontend/package.json ./frontend/
 
-# Устанавливаем PM2 для управления процессами
-RUN npm install -g pm2
-
-# Создаем конфиг PM2 для запуска обоих приложений
-RUN echo '{ \
-  "apps": [ \
-    { \
-      "name": "backend", \
-      "cwd": "/app/backend", \
-      "script": "dist/main.js", \
-      "instances": 1, \
-      "exec_mode": "fork", \
-      "env": { \
-        "NODE_ENV": "production" \
-      } \
-    }, \
-    { \
-      "name": "frontend", \
-      "cwd": "/app/frontend", \
-      "script": "dist/server/entry.mjs", \
-      "instances": 1, \
-      "exec_mode": "fork", \
-      "env": { \
-        "NODE_ENV": "production", \
-        "HOST": "0.0.0.0", \
-        "PORT": "4321" \
-      } \
-    } \
-  ] \
-}' > /app/ecosystem.config.json
+# Создаем startup скрипт
+RUN echo '#!/bin/sh\n\
+set -e\n\
+\n\
+# Запускаем backend в фоне\n\
+cd /app/backend && node dist/main.js &\n\
+BACKEND_PID=$!\n\
+\n\
+# Запускаем frontend в фоне\n\
+cd /app/frontend && HOST=0.0.0.0 PORT=4321 node dist/server/entry.mjs &\n\
+FRONTEND_PID=$!\n\
+\n\
+# Функция для graceful shutdown\n\
+cleanup() {\n\
+  echo "Stopping services..."\n\
+  kill $BACKEND_PID $FRONTEND_PID 2>/dev/null || true\n\
+  wait $BACKEND_PID $FRONTEND_PID 2>/dev/null || true\n\
+  exit 0\n\
+}\n\
+\n\
+trap cleanup SIGTERM SIGINT\n\
+\n\
+# Ждем завершения процессов\n\
+wait\n\
+' > /app/start.sh && chmod +x /app/start.sh
 
 # Открываем порты
 EXPOSE 4000 4321
 
-# Запускаем оба приложения через PM2
-CMD ["pm2-runtime", "start", "/app/ecosystem.config.json"]
+# Запускаем оба приложения
+CMD ["/app/start.sh"]
