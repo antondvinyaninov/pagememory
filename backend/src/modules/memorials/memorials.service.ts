@@ -1015,6 +1015,18 @@ export class MemorialsService {
     };
   }
 
+  private async isAdmin(userId: number): Promise<boolean> {
+    const sql = `
+      SELECT id
+      FROM users
+      WHERE id = $1
+        AND LOWER(COALESCE(role, '')) IN ('admin', 'superadmin', 'super_admin')
+      LIMIT 1
+    `;
+    const result = await this.db.client.query(sql, [userId]);
+    return result.rows.length > 0;
+  }
+
   async update(userId: number, id: number, input: UpsertMemorialInput): Promise<MemorialDto> {
     const existingSql = `
       SELECT
@@ -1052,7 +1064,12 @@ export class MemorialsService {
     if (!existing) {
       throw new NotFoundException("Memorial not found");
     }
-    if (existing.user_id !== userId) {
+    
+    // Проверяем права: либо владелец, либо администратор
+    const isOwner = existing.user_id === userId;
+    const isAdminUser = await this.isAdmin(userId);
+    
+    if (!isOwner && !isAdminUser) {
       throw new Error("Недостаточно прав для редактирования мемориала");
     }
 
@@ -1815,11 +1832,13 @@ export class MemorialsService {
       throw new NotFoundException("Воспоминание не найдено");
     }
 
-    // Проверяем, что пользователь является автором воспоминания
+    // Проверяем права: либо автор воспоминания, либо администратор
     const memoryUserId = typeof memory.user_id === 'string' ? Number(memory.user_id) : Number(memory.user_id);
     const currentUserId = Number(userId);
+    const isAuthor = Number.isFinite(memoryUserId) && Number.isFinite(currentUserId) && memoryUserId === currentUserId;
+    const isAdminUser = await this.isAdmin(userId);
     
-    if (!Number.isFinite(memoryUserId) || !Number.isFinite(currentUserId) || memoryUserId !== currentUserId) {
+    if (!isAuthor && !isAdminUser) {
       throw new UnauthorizedException("Вы не можете удалить это воспоминание");
     }
 
