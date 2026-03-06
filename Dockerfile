@@ -47,7 +47,7 @@ RUN echo '{ \
       "cwd": "/app/backend", \
       "script": "dist/main.js", \
       "instances": 1, \
-      "exec_mode": "cluster", \
+      "exec_mode": "fork", \
       "env": { \
         "NODE_ENV": "production" \
       } \
@@ -57,7 +57,7 @@ RUN echo '{ \
       "cwd": "/app/frontend", \
       "script": "dist/server/entry.mjs", \
       "instances": 1, \
-      "exec_mode": "cluster", \
+      "exec_mode": "fork", \
       "env": { \
         "NODE_ENV": "production", \
         "HOST": "0.0.0.0", \
