@@ -1,6 +1,13 @@
 # Multi-stage build
 FROM node:20-alpine AS builder
 
+# Устанавливаем шрифты для поддержки кириллицы
+RUN apk add --no-cache \
+    fontconfig \
+    ttf-dejavu \
+    font-noto \
+    font-noto-cjk
+
 WORKDIR /app
 
 # Копируем все файлы
@@ -22,7 +29,13 @@ RUN cd frontend && npm ci && \
 # Production образ
 FROM node:20-alpine
 
-RUN apk add --no-cache nginx
+# Устанавливаем шрифты для поддержки кириллицы в Sharp
+RUN apk add --no-cache \
+    nginx \
+    fontconfig \
+    ttf-dejavu \
+    font-noto \
+    font-noto-cjk
 
 WORKDIR /app
 
