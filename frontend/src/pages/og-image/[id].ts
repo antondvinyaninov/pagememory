@@ -69,7 +69,7 @@ export const GET: APIRoute = async ({ params }) => {
   const middleName = memorial.middle_name ?? "";
   const birthDate = formatDate(memorial.birth_date);
   const deathDate = formatDate(memorial.death_date);
-  const location = memorial.birth_place || memorial.burial_city || memorial.burial_place || "";
+  const location = memorial.burial_city || memorial.burial_place || "";
   const photoUrl = resolvePhotoUrl(memorial);
 
   try {

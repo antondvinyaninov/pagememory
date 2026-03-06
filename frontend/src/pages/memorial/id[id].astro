@@ -294,7 +294,7 @@ const hasMediaData = memorialPhotos.length > 0 || memorialVideos.length > 0 || b
                         </span>
                       </div>
 
-                      {memorial.birth_place && (
+                      {memorial.burial_city && (
                         <div class="mt-4 flex items-center justify-center gap-2 text-slate-100 lg:justify-start">
                           <svg
                             class="w-4 h-4 sm:w-5 sm:h-5 text-white/90"
@@ -316,7 +316,7 @@ const hasMediaData = memorialPhotos.length > 0 || memorialVideos.length > 0 || b
                             ></path>
                           </svg>
                           <span class="text-sm sm:text-base">
-                            {memorial.birth_place}
+                            {memorial.burial_city}
                           </span>
                         </div>
                       )}
