@@ -35,6 +35,9 @@ ENV PUBLIC_SITE_NAME=$PUBLIC_SITE_NAME
 ENV PUBLIC_PROJECT_ICON_URL=$PUBLIC_PROJECT_ICON_URL
 ENV PUBLIC_YANDEX_MAPS_API_KEY=$PUBLIC_YANDEX_MAPS_API_KEY
 
+# Для SSR запросов нужен полный URL к backend
+ENV API_BASE_URL=http://127.0.0.1:4000/api
+
 RUN cd frontend && npm run build
 
 # Production образ
@@ -60,6 +63,9 @@ COPY nginx.conf /etc/nginx/nginx.conf
 # Копируем startup скрипт
 COPY start.sh /app/start.sh
 RUN chmod +x /app/start.sh
+
+# Устанавливаем переменную для SSR запросов к backend
+ENV API_BASE_URL=http://127.0.0.1:4000/api
 
 # Открываем только порт 80 для nginx
 EXPOSE 80
