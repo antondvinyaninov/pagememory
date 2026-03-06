@@ -1,11 +1,12 @@
 import type { APIRoute } from "astro";
+import { getApiBaseUrl } from "../../lib/api-url";
 
 /**
  * Генерация sitemap.xml для поисковых систем
  * Включает главную страницу и все опубликованные мемориалы
  */
 export const GET: APIRoute = async () => {
-  const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
+  const API_BASE_URL = getApiBaseUrl();
   
   // Всегда используем продакшен домен
   // В разработке можно переопределить через PUBLIC_APP_URL в .env
