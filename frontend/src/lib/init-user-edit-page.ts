@@ -134,25 +134,30 @@ export function initUserEditPage(apiBaseUrl: string, s3BaseUrl: string): void {
     event.preventDefault();
 
     const data = new FormData(formEl);
+    
+    // Удаляем city_hidden из FormData, так как это служебное поле
+    const cityHidden = String(data.get("city_hidden") || "").trim();
+    const cityVisible = String(data.get("city") || "").trim();
+    
+    // Определяем финальное значение города
+    let cityValue = cityHidden;
+    if (!cityValue && cityVisible) {
+      cityValue = cityVisible.includes(",") 
+        ? cityVisible.split(",")[0].trim()
+        : cityVisible;
+    }
+    
+    // Удаляем служебное поле
+    data.delete("city_hidden");
+    
+    // Устанавливаем правильное значение города
+    data.set("city", cityValue);
     data.set("first_name", String(data.get("first_name") || "").trim());
     data.set("last_name", String(data.get("last_name") || "").trim());
     data.set("middle_name", String(data.get("middle_name") || "").trim());
     data.set("email", String(data.get("email") || "").trim());
     data.set("country", String(data.get("country") || "").trim());
     data.set("region", String(data.get("region") || "").trim());
-    // Используем скрытое поле city_hidden, если оно есть, иначе видимое поле city
-    const cityHidden = String(data.get("city_hidden") || "").trim();
-    const cityVisible = String(data.get("city") || "").trim();
-    // Если city_hidden пустой, но cityVisible содержит запятую (город, регион),
-    // извлекаем только город (часть до запятой)
-    let cityValue = cityHidden;
-    if (!cityValue && cityVisible) {
-      // Если есть запятая, берем часть до запятой (город)
-      cityValue = cityVisible.includes(",") 
-        ? cityVisible.split(",")[0].trim()
-        : cityVisible;
-    }
-    data.set("city", cityValue);
 
     try {
       const res = await fetch(`${apiBaseUrl}/users/me`, {

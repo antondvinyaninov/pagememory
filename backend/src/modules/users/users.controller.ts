@@ -20,13 +20,32 @@ import { FileInterceptor } from "@nestjs/platform-express";
 import type { Express } from "express";
 import { StorageService } from "../../common/storage.service";
 
+import { IsEmail, IsOptional, IsString } from "class-validator";
+
 class UpdateProfileDto {
+  @IsString()
   first_name!: string;
+  
+  @IsString()
   last_name!: string;
+  
+  @IsOptional()
+  @IsString()
   middle_name?: string;
+  
+  @IsEmail()
   email!: string;
+  
+  @IsOptional()
+  @IsString()
   country?: string;
+  
+  @IsOptional()
+  @IsString()
   region?: string;
+  
+  @IsOptional()
+  @IsString()
   city?: string;
 }
 
