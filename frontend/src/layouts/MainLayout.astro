@@ -44,7 +44,18 @@ const PROJECT_ICON_URL =
   !PROJECT_ICON_URL_ENV || PROJECT_ICON_URL_ENV === "/brand/memory-icon.png"
     ? bundledProjectIconUrl
     : PROJECT_ICON_URL_ENV;
-const GTM_ID = import.meta.env.PUBLIC_GTM_ID ?? "";
+
+// Загружаем GTM ID из базы данных
+let GTM_ID = import.meta.env.PUBLIC_GTM_ID ?? "";
+try {
+  const settingsRes = await fetch(`${API_BASE_URL}/admin/settings`);
+  if (settingsRes.ok) {
+    const settings = await settingsRes.json();
+    GTM_ID = String(settings?.gtm_id ?? GTM_ID);
+  }
+} catch {
+  // Используем значение из env если API недоступен
+}
 
 const computedMetaDescription = (metaDescription ?? description ?? "").trim() || "Цифровые страницы памяти о близких";
 const computedMetaTitle = (metaTitle ?? title ?? SITE_NAME).trim() || SITE_NAME;
