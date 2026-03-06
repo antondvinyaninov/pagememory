@@ -14,7 +14,15 @@ if (adminGuard instanceof Response) {
 const { cookieHeader } = adminGuard;
 const page = Number(Astro.url.searchParams.get("page") || "1");
 
-let memorials = [];
+type Memorial = {
+  id: number;
+  first_name: string;
+  last_name: string;
+  status: string;
+  created_at: string;
+};
+
+let memorials: Memorial[] = [];
 let totalPages = 1;
 let errorMessage = "";
 try {

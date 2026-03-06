@@ -1,4 +1,4 @@
-type RedirectFn = (path: string, status?: number) => Response;
+type RedirectFn = (path: string, status?: 301 | 302 | 303 | 307 | 308 | 300 | 304) => Response;
 
 type AdminContext = {
   request: Request;
