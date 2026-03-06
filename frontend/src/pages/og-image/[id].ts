@@ -1,6 +1,13 @@
 import { ImageResponse } from "@vercel/og";
 import type { APIRoute } from "astro";
 
+// Buffer доступен глобально в Node.js runtime
+declare const Buffer: {
+  from(data: ArrayBuffer | string, encoding?: string): {
+    toString(encoding: string): string;
+  };
+};
+
 export const GET: APIRoute = async ({ params }) => {
   const { id: rawId } = params;
   const id = rawId ? String(rawId).replace(/^id/, "") : null;
