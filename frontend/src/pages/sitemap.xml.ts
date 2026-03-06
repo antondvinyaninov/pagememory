@@ -1,5 +1,5 @@
 import type { APIRoute } from "astro";
-import { getApiBaseUrl } from "../../lib/api-url";
+import { getApiBaseUrl } from "../lib/api-url";
 
 /**
  * Генерация sitemap.xml для поисковых систем
