@@ -1,6 +1,7 @@
 ---
 import MemorialEditorIsland from "./islands/MemorialEditorIsland";
 import { declineToGenitive } from "../lib/decline-name";
+import { getApiBaseUrl } from "../lib/api-url";
 
 interface MemorialData {
   id?: number;
@@ -42,7 +43,8 @@ const current = memorial ?? {};
 const title = mode === "edit" ? "Редактировать мемориал" : "Создать мемориал";
 const submitLabel = mode === "edit" ? "Сохранить изменения" : "Сохранить как черновик";
 const publishLabel = mode === "edit" ? "Сохранить и опубликовать" : "Опубликовать";
-const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
+const API_BASE_URL = getApiBaseUrl();
+const CLIENT_API_URL = import.meta.env.DEV ? 'http://localhost:4000/api' : '/api';
 const S3_BASE_URL = import.meta.env.PUBLIC_S3_BASE_URL ?? "https://s3.firstvds.ru/memory";
 const YANDEX_MAPS_API_KEY = import.meta.env.PUBLIC_YANDEX_MAPS_API_KEY ?? "";
 const APP_BASE_URL = import.meta.env.PUBLIC_APP_URL ?? "";
@@ -57,7 +59,7 @@ const deathDate = current.death_date ? String(current.death_date).slice(0, 10) :
   data-memorial-editor
   data-mode={mode}
   data-memorial-id={current.id ? String(current.id) : ""}
-  data-api-base-url={API_BASE_URL}
+  data-api-base-url={CLIENT_API_URL}
   data-s3-base-url={S3_BASE_URL}
   data-yandex-maps-api-key={YANDEX_MAPS_API_KEY}
   data-app-base-url={APP_BASE_URL}

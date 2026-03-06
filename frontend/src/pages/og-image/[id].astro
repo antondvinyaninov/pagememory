@@ -1,9 +1,11 @@
 ---
+import { getApiBaseUrl } from "../lib/api-url";
+
 const { id: rawId } = Astro.params;
 // Убираем префикс "id" если он есть (например, "id1" -> "1", "1" -> "1")
 const id = rawId ? String(rawId).replace(/^id/, "") : null;
 
-const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
+const API_BASE_URL = getApiBaseUrl();
 const S3_BASE_URL = import.meta.env.PUBLIC_S3_BASE_URL ?? "https://s3.firstvds.ru/memory";
 const SITE_NAME = import.meta.env.PUBLIC_SITE_NAME ?? "Страницы памяти";
 

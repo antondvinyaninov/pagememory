@@ -3,6 +3,7 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 import AdminSettingsPageIsland from "../../components/islands/AdminSettingsPageIsland";
 import { requireAdminPage } from "../../lib/admin-access";
 import bundledProjectIcon from "../../assets/memory-icon.png";
+import { getApiBaseUrl } from "../../lib/api-url";
 
 const siteName = import.meta.env.PUBLIC_SITE_NAME ?? "Страницы памяти";
 const bundledProjectIconUrl = bundledProjectIcon.src;
@@ -11,7 +12,8 @@ const projectIcon =
   !projectIconEnv || projectIconEnv === "/brand/memory-icon.png"
     ? bundledProjectIconUrl
     : projectIconEnv;
-const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
+const API_BASE_URL = getApiBaseUrl();
+const CLIENT_API_URL = import.meta.env.DEV ? 'http://localhost:4000/api' : '/api';
 const adminGuard = await requireAdminPage(Astro, API_BASE_URL);
 if (adminGuard instanceof Response) {
   return adminGuard;
@@ -108,5 +110,5 @@ try {
     </div>
   </div>
 
-  <AdminSettingsPageIsland apiBaseUrl={API_BASE_URL} client:idle />
+  <AdminSettingsPageIsland apiBaseUrl={CLIENT_API_URL} client:idle />
 </AdminLayout>

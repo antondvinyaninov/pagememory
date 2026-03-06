@@ -9,7 +9,7 @@ export function initMemorialEditor(): void {
       const tabs = ["basic", "biography", "burial", "media", "people", "settings", "qrcode"];
       const mode = root.dataset.mode || "create";
       const memorialId = root.dataset.memorialId || "";
-      const apiBaseUrl = root.dataset.apiBaseUrl || "http://localhost:4000/api";
+      const apiBaseUrl = root.dataset.apiBaseUrl || "/api";
       const s3BaseUrl = root.dataset.s3BaseUrl || "https://s3.firstvds.ru/memory";
       const yandexMapsApiKey = root.dataset.yandexMapsApiKey || "";
       const appBaseUrl = root.dataset.appBaseUrl || "";

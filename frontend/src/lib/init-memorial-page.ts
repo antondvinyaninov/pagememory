@@ -4,7 +4,7 @@ export function initMemorialPage(): void {
     if (root.dataset.memorialPageInitialized === "1") return;
     root.dataset.memorialPageInitialized = "1";
 
-    const apiBaseUrl = root?.dataset.apiBaseUrl || "http://localhost:4000/api";
+    const apiBaseUrl = root?.dataset.apiBaseUrl || "/api";
     const memorialId = root?.dataset.memorialId || "";
     const tabs = ["memories", "about", "burial", "media", "people"];
     let burialMapInitialized = false;

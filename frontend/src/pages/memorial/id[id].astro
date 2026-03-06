@@ -6,6 +6,7 @@ import { getApiBaseUrl } from "../../lib/api-url";
 
 const { id } = Astro.params;
 const API_BASE_URL = getApiBaseUrl();
+const CLIENT_API_URL = import.meta.env.DEV ? 'http://localhost:4000/api' : '/api';
 
 // SSR-передача cookies для определения лайков пользователя
 const cookieHeader = Astro.request.headers.get("cookie") ?? "";
@@ -445,7 +446,7 @@ const hasMediaData = memorialPhotos.length > 0 || memorialVideos.length > 0 || b
           <div
             class="container mx-auto px-4 pb-16"
             id="memorial-tabs-root"
-            data-api-base-url={API_BASE_URL}
+            data-api-base-url={CLIENT_API_URL}
             data-memorial-id={String(memorial.id)}
           >
             <div class="grid gap-5 lg:grid-cols-[19rem_1fr]">
