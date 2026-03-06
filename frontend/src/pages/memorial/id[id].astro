@@ -146,13 +146,10 @@ function resolvePhotoUrlSmall(memorial: MemorialApi): string {
 }
 
 /**
- * Генерирует URL большого стилизованного изображения для Open Graph (1200x630)
- * Это будет стилизованное изображение, похожее на hero блок мемориала
- * Использует отдельный endpoint /og-image/[id] который генерирует стилизованное изображение
+ * Генерирует URL изображения для Open Graph
+ * Использует endpoint /og-image/[id] который генерирует PNG через @vercel/og
  */
 function resolvePhotoUrlForOG(memorial: MemorialApi): string {
-  // Используем стилизованное изображение через отдельный endpoint
-  // Это будет генерировать изображение, похожее на hero блок с данными мемориала
   const origin = import.meta.env.PUBLIC_APP_URL || "https://pagesofmemory.ru";
   return `${origin}/og-image/${memorial.id}`;
 }
