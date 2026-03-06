@@ -1,8 +1,9 @@
 ---
 import MainLayout from "../layouts/MainLayout.astro";
 import bundledProjectIcon from "../assets/memory-icon.png";
+import { getApiBaseUrl } from "../lib/api-url";
 
-const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL ?? "http://localhost:4000/api";
+const API_BASE_URL = getApiBaseUrl();
 const S3_BASE_URL = import.meta.env.PUBLIC_S3_BASE_URL ?? "https://s3.firstvds.ru/memory";
 const bundledProjectIconUrl = bundledProjectIcon.src;
 const PROJECT_ICON_URL_ENV = (import.meta.env.PUBLIC_PROJECT_ICON_URL ?? "").trim();
