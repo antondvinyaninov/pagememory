@@ -27,18 +27,13 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Устанавливаем только production зависимости для runtime
-COPY backend/package*.json ./backend/
-COPY frontend/package*.json ./frontend/
-
-RUN cd backend && npm ci --omit=dev
-RUN cd frontend && npm ci --omit=dev
-
-# Копируем собранные файлы
+# Копируем собранные файлы и node_modules из builder
 COPY --from=builder /app/backend/dist ./backend/dist
+COPY --from=builder /app/backend/node_modules ./backend/node_modules
 COPY --from=builder /app/backend/package.json ./backend/
 
 COPY --from=builder /app/frontend/dist ./frontend/dist
+COPY --from=builder /app/frontend/node_modules ./frontend/node_modules
 COPY --from=builder /app/frontend/package.json ./frontend/
 
 # Устанавливаем PM2 для управления процессами
