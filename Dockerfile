@@ -55,7 +55,9 @@ COPY start.sh /app/start.sh
 RUN chmod +x /app/start.sh
 
 # Устанавливаем переменную для SSR запросов к backend
+# Astro будет использовать эту переменную на сервере
 ENV API_BASE_URL=http://127.0.0.1:4000/api
+ENV PUBLIC_API_BASE_URL=/api
 
 # Открываем только порт 80 для nginx
 EXPOSE 80
